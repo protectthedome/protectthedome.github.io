@@ -73,11 +73,11 @@
           </div>
 		</div>
         <div class="row">
-          <div class="col-5">          
+          <div class="col-12 col-md-5">          
 			   <img src="images/circuits/TIVA_pins.png" style="width:100%">
 			  </div>
 			
-			 <div class="col-7">
+			 <div class="col-12 col-md-7">
             <table style="width:100%">
   <tr>
     <th>Pin</th>
@@ -128,11 +128,14 @@
 		  <h4 class="mt-0 mb-1">TOT System</h4>
 			<p> In order to play the game, the user has to inserts a TOT (stainless steel fender washer) into the game, much like a token at an arcade house. To detect the presence of the TOT, an optical approach was used. An IR beam would shine onto a photoreceiver and would produce a high signal when the IR beam was detected, and a low signal when it wasn’t. When the TOT is inserted, it breaks the beam, resulting in a falling edge, which could be checked for. </p>
 			<p>To keep the TOT from rolling all the way to the retrieval point before the game is over, a servo was mounted such that the servo horn obstructed the TOT's path and held it partway through the channel.&nbsp;</p>
-<div class="text-center">
-		  <img src="images/circuits/tot_circuit.png" style="width:60%">
+		
+			
+			</div>
+			  <div class="col-12 col-md-6">
+		  <img src="images/circuits/tot_circuit.png" style="width:100%">
 		  </div>
 			  
-			  </div>
+			  
 		</div>
         
 			  
@@ -151,12 +154,13 @@
 			<p>The output of the rectifier was then run through a divider consisting of a fixed 10k resistor connected to the positive output of the rectifier and a 10k potentiometer connected to ground. The common node between both was connected to a unity gain buffer (LM324N) whose output went into a low pass filter to create a voltage mirror. This prevents the impedance of the divider circuit form affecting the low pass filter. The values of the C and R were chosen empirically, seeing what cutoff frequency would best squash the noise observed in the signal.</p>
 			<p>Finally, the analog singnal went into a 74HCT14, which produces a digital output. The resistance of the 10k potentiometer was then tuned to determine at what speed the user would need to turn the crank to result in a transition (falling edge) from the 74HCT14. </p>
 			<p>A power gauge on the control panel provides a visual indication of the power level achieved by the user turning the crank. This gauge was actuated by a servo motor.&nbsp; &nbsp; &nbsp;</p>
-<div class="text-center">
-		  <img src="images/circuits/power_crank_circuit.png" style="width:70%"> 
+</div>
+			  <div class="col-12 col-md-10">
+		  <img src="images/circuits/power_crank_circuit.png" style="width:100%"> 
 				
 		  </div>
 			  
-		    </div>
+		    
 		</div>
         
 			  
@@ -174,10 +178,11 @@
 		  <h4 class="mt-0 mb-1">Meteorites</h4>
 			<p> Falling meteorites were simulated using 3 banks of 8 LEDs each. In order to control these LEDs, 3 74HCT595 shift registers where cascaded to produce an effective 24 bit shift register. Each 595 was dedicated to a specific bank. Since the current being sourced into the LEDs was well within the output limits of the 595, no transistors were required as the LEDs were connected directly to the outputs. </p>
 			
-			<div class="text-center">
-			  <img src="images/circuits/meteor_circuit.png" style="width:90%">
-				
+			</div>
+			  <div class="col-12 col-md-10">
+			  <img src="images/circuits/meteor_circuit.png" style="width:100%">
 			  </div>
+			  <div class="col-12"> 
 			 <h6 class="mt-0 mb-1">Meteor PCB</h6>
 In order to save on cabling, and the inevitable nightmare of debugging a large rat’s nest of wires, we decided to create a PCB for each of the meteorite banks. The PCB contains 8 LEDs, arranged linearly (1” apart), a shift register, and a 74HCT14 inverter. There were 3 connections on the PCB: power, input to the shift register, and an output from the shift register for cascading. The 74HCT14 was used to ensure the shift register received clean square waves on the data, serial clock and register clock lines. This was done since there are long cables running from the PCBs to the TiVa.
 			  			<div class="text-center">
@@ -230,12 +235,13 @@ In order to save on cabling, and the inevitable nightmare of debugging a large r
 		  <h4 class="mt-0 mb-1">Timer Display</h4>
 			<p> The timer display is actuated by a servo motor.</p>
 			
-			<div class="text-center">
-			  <img src="images/circuits/timer_circuit.png" style="width:20%">
+			</div>
+			  <div class="col-6 col-md-3">
+			  <img src="images/circuits/timer_circuit.png" style="width:100%">
 				
 			  </div>
 			  
-		    </div>
+		    
 		</div>
         
 			  
@@ -252,12 +258,13 @@ In order to save on cabling, and the inevitable nightmare of debugging a large r
 		  <h4 class="mt-0 mb-1">Warning LED and buzzer</h4>
 			<p> The warning LED and buzzer are controlled by a shift register (74HCT595). Due to the relatively high current demand of the LEDs and buzzer, low side drive was used, with the outputs of the shift register connected to the gates of the MOSFETs. To further save on pins, the first 3 outputs controlled the 3 fans of the air leak.</p>
 			
-			<div class="text-center">
-			  <img src="images/circuits/warning_circuit.png" style="width:70%">
+			</div>
+			  <div class="col-12 col-md-7">
+			  <img src="images/circuits/warning_circuit.png" style="width:100%">
 				
 			  </div>
 			  
-		    </div>
+		    
 		</div>
         
 			  
