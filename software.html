@@ -91,7 +91,7 @@
 			<li>The first interaction is to <strong>Power the Dome:</strong></li>
 				  <ol type="1">
 					<li>The warning LED corresponding to "Power the Dome" game will illuminate.</li>
-					  <li>The user turns the crank. This generates a voltage from a DC motor.</li>
+					  <li>The user turns the crank. This generates a voltage across a DC motor.</li>
 					  <li>While the user is turning the crank, the power gauge level will increase.</li>
 					  <li>When the power level reaches 100%, the interaction finishes, and the warning LED will go off.</li>
 					  </ol>
@@ -99,7 +99,7 @@
 			<li>During the rest of the game, the user will encounter 2 possible games: "Shoot Down Meteorites", or "Plug Air Leaks". The active game will be indicated by the warning LED.</li>
 			<strong>Shoot Down Meteorites:</strong>
 			<ol type="1">
-			<li>The crisis indicator LED corresponding to "Shoot Down Meteorites" game will light.</li>
+			<li>The crisis indicator LED corresponding to "Shoot Down Meteorites" game will illuminate.</li>
 			<li>On the back panel, the first LED of one of the 3 meteorite banks will turn on. The meteorite will move downwards, closer to the dome.</li>
 			<li>If the meteorite reaches the dome, the user loses the game.</li>
 			<li>To shoot down the meteorite the user needs to move the cannon, pointing it towards the meteorite, and then press the blue button to fire the cannon.</li>
@@ -107,7 +107,7 @@
 			</ol>
 			<strong>Air Leaks:</strong>
 			<ol type="1">
-			<li>The crisis indicator LED corresponding to "Air Leak" game will light. The buzzer will also sound at the beginning of the game.</li>
+			<li>The crisis indicator LED corresponding to "Air Leak" game will illuminate. The buzzer will also sound at the beginning of the game.</li>
 			<li>One of the 3 possible fans will turn on.</li>
 			<li>The oxygen gauge level will start decreasing steadily. If this level reaches zero, the user loses the game.</li>
 			<li>The user must use their hands to feel for the location of the leak. When they find it, they must insert the plug into the air leak hole. This event will be detected via a hall sensor inside the hole, and a magnet in the plug.</li>
@@ -137,26 +137,26 @@
 			There are 10 state machines/services involved:
 			  <ol type="1">
 				<li><i>Arcade FSM:</i> Controls what interactions are to occur.</li>
-				<li><i>Global Timer Service:</i> Monitors time for user to complete game.</li>
-				<li><i>Reset Service:</i> Monitors for user interaction with device.</li>
+				<li><i>Global Timer Service:</i> Monitors time for the user to complete game.</li>
+				<li><i>Reset Service:</i> Monitors for user interactions with device.</li>
 				<li><i>Welcome FSM:</i> Executes welcome mode. </li>
-				<li><i>Air Leaks SM:</i> User interaction where user needs to plug air leaks before oxygen runs out.</li>
-				<li><i>Power Crank SM:</i> User interaction where user needs to turn a crank to generate power for the dome and be able to use the cannon.</li>
-				<li><i>Meteor SM:</i> User interaction where user needs to shoot down meteors.</li>
-				<li><i>Cannon SM:</i> Moves cannon based on analog input, and gives a vibratory feedback when meteor is destroyed.</li>
-				<li><i>Button Debounce:</i> Button for firing the cannon.</li>
-				<li><i>End Game FSM:</i> Controls sequence events for winning or losing the game. Return the TOT.</li>
+				<li><i>Air Leaks SM:</i> User interaction where the user needs to plug air leaks before oxygen runs out.</li>
+				<li><i>Power Crank SM:</i> User interaction where the user needs to turn a crank to generate power for the dome and be able to use the cannon.</li>
+				<li><i>Meteor SM:</i> User interaction where the user needs to shoot down meteors.</li>
+				<li><i>Cannon SM:</i> Moves the cannon based on an analog input, and gives vibratory feedback when meteor is destroyed.</li>
+				<li><i>Button Debounce:</i> Debounces button for firing the cannon.</li>
+				<li><i>End Game FSM:</i> Controls the sequence of events for winning or losing the game. Returns the TOT.</li>
 			  </ol>
 			There are 5 event checkers:
 			  <ol type="1">
-				<li><i>Pot Checker:</i> Post New_Pot_Value to Reset_SM and Cannon_SM when user moves the cannon positioning knob.</li>
-				<li><i>Button Checker:</i> Post Button_Down to Debounce when user presses button to fire the cannon.</li>
-				<li><i>Crank Checker:</i> Post Falling_edge or Rising_Edge to Reset_SM and PowerCrank_SM if the user begins or stops moving the crank for power generation.</li>
-				<li><i>Air plug Checker:</i> Post AirflowPlugged to  Reset_SM and AirLeak_SM when the user plugs an air leak.</li>
-				<li><i>Tot Checker:</i> Check if TOT was inserted. Post Tot_Inserted to all.</li>
+				<li><i>Pot Checker:</i> Posts New_Pot_Value to Reset_SM and Cannon_SM when user moves the cannon positioning knob.</li>
+				<li><i>Button Checker:</i> Posts Button_Down to Debounce when user presses button to fire the cannon.</li>
+				<li><i>Crank Checker:</i> Posts Falling_edge or Rising_Edge to Reset_SM and PowerCrank_SM if the user begins or stops moving the crank for power generation.</li>
+				<li><i>Air plug Checker:</i> Posts AirflowPlugged to  Reset_SM and AirLeak_SM when the user plugs an air leak.</li>
+				<li><i>Tot Checker:</i> Checks if TOT was inserted. Posts Tot_Inserted to all.</li>
 		    </ol>
 			  <br></br>
-			  <strong>Diagrams notation: </strong> Each box corresponds to a state, the arrows are transition. The transition notation: Event_name(event_parameter)[Conditions]/ Actions.
+			  <strong>Diagrams notation: </strong> Each box corresponds to a state, the arrows are transitions. The transition notation: Event_name(event_parameter)[Conditions]/ Actions.
 			  <br></br>
 		  <br></br>
 			  <div class="row"><h5 class="mt-0 mb-1">Arcade FSM</h5></div>
@@ -235,7 +235,7 @@
 				<li><i>Meteor:</i> Lights up the trace LEDs for the meteors. Utilizes the low level ShiftRegisterWrite_24 module.</li>
 				<li><i>PowerLib:</i> Reads the comparator output and controls the power gauge.</li>
 				<li><i>Servo:</i>  Acts as the low level interface to move the servo motors using PWM functions.</li>
-				<li><i>ShiftRegisterWrite:</i>  Low level interface to&nbsp; write shift register.</li>
+				<li><i>ShiftRegisterWrite:</i>  Low level interface to&nbsp; write to 1 shift register.</li>
 				<li><i>ShiftRegisterWrite_24:</i> Low level interface to write to 3 cascaded shift registers.</li>
 				<li><i>TOT:</i> Looks for the TOT on insertion and controls the release of it.</li>
 			  </ol>
