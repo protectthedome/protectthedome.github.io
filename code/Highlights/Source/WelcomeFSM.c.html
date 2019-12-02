@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>WelcomeFSM.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   WelcomeFSM.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This state machine specifies the behavior of our Arcade in Welcome Mode!</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl com">/*----------------------------- Include Files -----------------------------*/</span>
+<span class="hl com">/* include header files for this state machine as well as any machines at the</span>
+<span class="hl com">   next lower level in the hierarchy that are sub-machines to this machine</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Configure.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Framework.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">// Libraries</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;WelcomeFSM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Meteor.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;AirLeakLib.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;PowerLib.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ArcadeFSM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Crisis.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Servo.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl com">/*----------------------------- Module Defines ----------------------------*/</span>
+<span class="hl ppc">#define STEP_DELAY 100</span>
+<span class="hl ppc">#define LED_MOD 2</span> <span class="hl slc">// should be a power of 2</span>
+<span class="hl ppc"></span>
+<span class="hl com">/*---------------------------- Module Functions ---------------------------*/</span>
+<span class="hl com">/* prototypes for private functions for this machine.They should be functions</span>
+<span class="hl com">   relevant to the behavior of this state machine</span>
+<span class="hl com">*/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">StepCannonGauge</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">void</span> <span class="hl kwd">StepLED</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+
+<span class="hl com">/*---------------------------- Module Variables ---------------------------*/</span>
+<span class="hl slc">// everybody needs a state variable, you may need others as well.</span>
+<span class="hl slc">// type of state variable should match htat of enum in header file</span>
+<span class="hl kwb">static</span> WelcomeState_t CurrentState<span class="hl opt">;</span>
+
+<span class="hl slc">// with the introduction of Gen2, we need a module level Priority var as well</span>
+<span class="hl kwb">static uint8_t</span> MyPriority<span class="hl opt">;</span>
+
+<span class="hl slc">// Indiates whether cannon + gauges moving CW (true) or CCW (false)</span>
+<span class="hl kwb">static bool</span> DirectionFlag<span class="hl opt">;</span>
+
+<span class="hl slc">// For LED timing</span>
+<span class="hl kwb">static uint16_t</span> counter<span class="hl opt">;</span>
+
+
+<span class="hl com">/*------------------------------ Module Code ------------------------------*/</span>
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     InitWelcomeFSM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     uint8_t : the priorty of this service</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool, false if error in initialization, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Saves away the priority, sets up the initial transition and does any</span>
+<span class="hl com">     other required initialization for this state machine</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     RPT, 11/8/19</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">InitWelcomeFSM</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Priority<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  ES_Event_t ThisEvent<span class="hl opt">;</span>
+
+  MyPriority <span class="hl opt">=</span> Priority<span class="hl opt">;</span>
+  <span class="hl slc">// put us into the Initial PseudoState</span>
+  CurrentState <span class="hl opt">=</span> InitPState<span class="hl opt">;</span>
+  <span class="hl slc">// post the initial transition event</span>
+  ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_INIT<span class="hl opt">;</span>
+  <span class="hl kwa">if</span> <span class="hl opt">(</span><span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span>MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">) ==</span> <span class="hl kwa">true</span><span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwa">return true</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+  <span class="hl kwa">else</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwa">return false</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     PostWelcomeFSM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     EF_Event_t ThisEvent , the event to post to the queue</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     boolean False if the Enqueue operation failed, True otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Posts an event to this state machine&#39;s queue</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     RPT, 11/8/19</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">PostWelcomeFSM</span><span class="hl opt">(</span>ES_Event_t ThisEvent<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwa">return</span> <span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span>MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">    RunWelcomeFSM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">   ES_Event_t : the event to process</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">   ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   add your description here</span>
+<span class="hl com"> Notes</span>
+<span class="hl com">   uses nested switch/case to implement the machine.</span>
+<span class="hl com"> Author</span>
+<span class="hl com">   RPT, 11/8/19</span>
+<span class="hl com">****************************************************************************/</span>
+ES_Event_t <span class="hl kwd">RunWelcomeFSM</span><span class="hl opt">(</span>ES_Event_t ThisEvent<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  ES_Event_t ReturnEvent<span class="hl opt">;</span>
+  ES_Event_t NewEvent<span class="hl opt">;</span>
+  ReturnEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_NO_EVENT<span class="hl opt">;</span> <span class="hl slc">// assume no errors</span>
+
+  <span class="hl kwa">switch</span> <span class="hl opt">(</span>CurrentState<span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwa">case</span> InitPState<span class="hl opt">:</span>        <span class="hl slc">// If current state is initial Psedudo State</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_INIT<span class="hl opt">)</span>    <span class="hl slc">// only respond to ES_Init</span>
+      <span class="hl opt">{</span>
+        CurrentState <span class="hl opt">=</span> Idle_W<span class="hl opt">;</span>
+        NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Go_Welcome_Mode<span class="hl opt">;</span>
+        <span class="hl kwd">PostWelcomeFSM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+      <span class="hl opt">}</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+
+    <span class="hl kwa">case</span> Idle_W<span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwa">switch</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType<span class="hl opt">)</span>
+      <span class="hl opt">{</span>
+        <span class="hl kwa">case</span> Go_Welcome_Mode<span class="hl opt">:</span> 
+        <span class="hl opt">{</span>
+          <span class="hl slc">// set DirectionFlag to true (start moving CW)</span>
+          DirectionFlag <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span>
+          <span class="hl slc">// Move the gauges to empty</span>
+          <span class="hl kwd">AirLeak_MoveGauge</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">);</span>
+          <span class="hl kwd">PowerLib_MoveGauge</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">);</span>
+          <span class="hl slc">// Move cannon fully to one side</span>
+          <span class="hl kwd">Cannon_ManualPosition</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">);</span>
+          <span class="hl slc">// Turn all LEDs off</span>
+          <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+          <span class="hl slc">// Turn off Crisis LEDs</span>
+          <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          <span class="hl slc">// Reset Global Timer</span>
+          <span class="hl kwd">Servo_MoveTimer</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">);</span>
+          <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">Zereod</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+          <span class="hl slc">// set CurrentState to Welcome</span>
+          CurrentState <span class="hl opt">=</span> Welcome<span class="hl opt">;</span>
+          <span class="hl slc">// Start timer</span>
+          <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>WELCOME_TIMER<span class="hl opt">,</span> STEP_DELAY<span class="hl opt">);</span>
+        <span class="hl opt">}</span>
+        <span class="hl kwa">break</span><span class="hl opt">;</span>
+
+        <span class="hl kwa">default</span><span class="hl opt">:</span>
+          <span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+
+    <span class="hl kwa">case</span> Welcome<span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwa">switch</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType<span class="hl opt">)</span>
+      <span class="hl opt">{</span>
+        <span class="hl kwa">case</span> Tot_Inserted<span class="hl opt">:</span> <span class="hl slc">// define this in ES_Configure</span>
+        <span class="hl opt">{</span>
+          <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+          <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          CurrentState <span class="hl opt">=</span> Idle_W<span class="hl opt">;</span>
+        <span class="hl opt">}</span>
+        <span class="hl kwa">break</span><span class="hl opt">;</span>
+
+        <span class="hl kwa">case</span> ES_TIMEOUT<span class="hl opt">:</span>
+        <span class="hl slc">//  printf(&quot;welcome&quot;);</span>
+          <span class="hl slc">// turn off all LEDs</span>
+          <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+          <span class="hl slc">// Step cannon</span>
+          <span class="hl slc">// Step o2 gauge</span>
+          <span class="hl slc">// Step power gauge</span>
+          <span class="hl kwd">StepCannonGauge</span><span class="hl opt">();</span>
+          <span class="hl slc">// if counter % LED_MOD is 0</span>
+          <span class="hl kwa">if</span> <span class="hl opt">( (</span>counter <span class="hl opt">%</span> LED_MOD<span class="hl opt">) ==</span> <span class="hl num">0</span><span class="hl opt">)</span>
+          <span class="hl opt">{</span>
+            <span class="hl kwd">StepLED</span><span class="hl opt">();</span>
+          <span class="hl opt">}</span>
+          <span class="hl slc">// init timer</span>
+          <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>WELCOME_TIMER<span class="hl opt">,</span> STEP_DELAY<span class="hl opt">);</span>
+          <span class="hl slc">// increment counter</span>
+          counter <span class="hl opt">=</span> counter <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">;</span>
+
+        <span class="hl kwa">default</span><span class="hl opt">:</span>
+          
+        
+          <span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+    <span class="hl kwa">default</span><span class="hl opt">:</span>
+      <span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+  <span class="hl kwa">return</span> ReturnEvent<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+WelcomeState_t <span class="hl kwd">QueryWelcomeState</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwa">return</span><span class="hl opt">(</span>CurrentState<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***************************************************************************</span>
+<span class="hl com"> private functions</span>
+<span class="hl com"> ***************************************************************************/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">StepCannonGauge</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl slc">// NOTE: asumming cannon &amp; gauges all at same position</span>
+  <span class="hl slc">// get current cannon position</span>
+  <span class="hl kwb">uint8_t</span> CurrentCannonPosition<span class="hl opt">;</span>
+  CurrentCannonPosition <span class="hl opt">=</span> <span class="hl kwd">QueryCannonPosition</span><span class="hl opt">();</span>
+  <span class="hl slc">// initialize variable NewCannonPosition</span>
+  <span class="hl kwb">uint8_t</span> NewCannonPosition<span class="hl opt">;</span>
+
+  <span class="hl slc">// if DirectionFlag = true (moving CW)</span>
+  <span class="hl kwa">if</span> <span class="hl opt">(</span>DirectionFlag <span class="hl opt">==</span> <span class="hl kwa">true</span><span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    <span class="hl slc">// if current servo pos == 100</span>
+    <span class="hl kwa">if</span> <span class="hl opt">(</span>CurrentCannonPosition <span class="hl opt">==</span> <span class="hl num">100</span><span class="hl opt">)</span>
+    <span class="hl opt">{</span>
+      <span class="hl slc">// set DirectionFlag to false</span>
+      DirectionFlag <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
+      <span class="hl slc">// decrement NewPosition</span>
+      NewCannonPosition <span class="hl opt">=</span> CurrentCannonPosition <span class="hl opt">-</span> <span class="hl num">1</span><span class="hl opt">;</span>
+      <span class="hl slc">// move cannon + gauges to NewPosition</span>
+      <span class="hl kwd">Cannon_ManualPosition</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+      <span class="hl kwd">AirLeak_MoveGauge</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+      <span class="hl kwd">PowerLib_MoveGauge</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">else</span>
+    <span class="hl opt">{</span>
+      <span class="hl slc">// increment NewPosition</span>
+      NewCannonPosition <span class="hl opt">=</span> CurrentCannonPosition <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">;</span>
+      <span class="hl slc">// move cannon + gauges to NewPosition</span>
+      <span class="hl kwd">Cannon_ManualPosition</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+      <span class="hl kwd">AirLeak_MoveGauge</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+      <span class="hl kwd">PowerLib_MoveGauge</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+    <span class="hl opt">}</span>
+  <span class="hl opt">}</span>
+  <span class="hl kwa">else</span>
+  <span class="hl opt">{</span>
+    <span class="hl slc">// if CurrentPosition = 0</span>
+    <span class="hl kwa">if</span> <span class="hl opt">(</span>CurrentCannonPosition <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl opt">)</span>
+    <span class="hl opt">{</span>
+      <span class="hl slc">// set DirectionFlag to true</span>
+      DirectionFlag <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span>
+      <span class="hl slc">// increment NewPosition</span>
+      NewCannonPosition <span class="hl opt">=</span> CurrentCannonPosition <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">;</span>
+      <span class="hl slc">// move cannon + gauges to NewPosition</span>
+      <span class="hl kwd">Cannon_ManualPosition</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+      <span class="hl kwd">AirLeak_MoveGauge</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+      <span class="hl kwd">PowerLib_MoveGauge</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+
+    <span class="hl opt">}</span>
+    <span class="hl kwa">else</span> <span class="hl opt">{</span>
+      <span class="hl slc">// decrement NewPosition</span>
+      NewCannonPosition <span class="hl opt">=</span> CurrentCannonPosition <span class="hl opt">-</span> <span class="hl num">1</span><span class="hl opt">;</span>
+      <span class="hl slc">// move cannon + gauges to NewPosition</span>
+      <span class="hl kwd">Cannon_ManualPosition</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+      <span class="hl kwd">AirLeak_MoveGauge</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+      <span class="hl kwd">PowerLib_MoveGauge</span><span class="hl opt">(</span>NewCannonPosition<span class="hl opt">);</span>
+    <span class="hl opt">}</span>
+  <span class="hl opt">}</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">void</span> <span class="hl kwd">StepLED</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl slc">// create variables to keep tack of which LED in which bank is on</span>
+  <span class="hl kwb">static uint8_t</span> Bank0LED<span class="hl opt">;</span>
+  <span class="hl kwb">static uint8_t</span> Bank1LED<span class="hl opt">;</span>
+  <span class="hl kwb">static uint8_t</span> Bank2LED<span class="hl opt">;</span>
+
+  <span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    Bank0LED <span class="hl opt">=</span> <span class="hl num">1</span><span class="hl opt">;</span>
+    Bank1LED <span class="hl opt">=</span> <span class="hl num">2</span><span class="hl opt">;</span>
+    Bank2LED <span class="hl opt">=</span> <span class="hl num">3</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+  <span class="hl slc">// Turn on the 3 LEDs corresponding to current step</span>
+  <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">,</span> Bank0LED<span class="hl opt">);</span>
+  <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">1</span><span class="hl opt">,</span> Bank1LED<span class="hl opt">);</span>
+  <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">2</span><span class="hl opt">,</span> Bank2LED<span class="hl opt">);</span>
+
+  <span class="hl slc">// update which LED will be on for each bank</span>
+  Bank0LED <span class="hl opt">= (</span>Bank0LED<span class="hl opt">%</span><span class="hl num">8</span><span class="hl opt">) +</span> <span class="hl num">1</span><span class="hl opt">;</span>
+  Bank1LED <span class="hl opt">= (</span>Bank1LED<span class="hl opt">%</span><span class="hl num">8</span><span class="hl opt">) +</span> <span class="hl num">1</span><span class="hl opt">;</span>
+  Bank2LED <span class="hl opt">= (</span>Bank2LED<span class="hl opt">%</span><span class="hl num">8</span><span class="hl opt">) +</span> <span class="hl num">1</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

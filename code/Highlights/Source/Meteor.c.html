@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Meteor.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   Meteor.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This module lights up the trace LEDs for the meteors. Utilizes the low level</span>
+<span class="hl com">   ShiftRegisterWrtie_24 module</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> History</span>
+<span class="hl com"> When           Who     What/Why</span>
+<span class="hl com"> -------------- ---     --------</span>
+<span class="hl com"> 11/7/19 22:24 ram     initial release</span>
+<span class="hl com"> </span>
+<span class="hl com">****************************************************************************/</span>
+
+<span class="hl slc">// the common headers for C99 types </span>
+<span class="hl ppc">#include &lt;stdint.h&gt;</span>
+<span class="hl ppc">#include &lt;stdbool.h&gt;</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;termio.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;BITDEFS.H&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">//ShiftRegisterWrtie_24</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ShiftRegisterWrite_24.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">//Definitions</span>
+<span class="hl ppc">#define BANK0_MASK 0x00FFFF00</span>
+<span class="hl ppc">#define BANK1_MASK 0x00FF00FF</span>
+<span class="hl ppc">#define BANK2_MASK 0x0000FFFF</span>
+
+<span class="hl com">/***Public Functions***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Meteor_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> BankNum<span class="hl opt">,</span> <span class="hl kwb">uint8_t</span> LEDNum<span class="hl opt">);</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+
+
+<span class="hl com">/***</span>
+<span class="hl com">Meteor_HWInit Function Description</span>
+<span class="hl com">	Arugments: None</span>
+<span class="hl com">	Returns: None</span>
+<span class="hl com">	Call the SR24 init function to intialize hardware to communicate with the </span>
+<span class="hl com">	cascaded registers</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Meteor_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Call SR24_HWInit fucntion</span>
+	<span class="hl kwd">SR24_Init</span><span class="hl opt">();</span>
+  <span class="hl kwd">SR24_Write</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">);</span>
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Meteor_LightLEDBank Function Description</span>
+<span class="hl com">	Arugments: BankNum, LEDNum</span>
+<span class="hl com">		BankNum: the bank to work with</span>
+<span class="hl com">		LEDNum: LED in the bank wished to light, 0 means all off</span>
+<span class="hl com">	Returns: Status</span>
+<span class="hl com">		If State = false, invalid parameters where given</span>
+<span class="hl com">	Figures out what value to write to SR24 to get the right LED lit. Will use </span>
+<span class="hl com">	masks to preserve the lighting on any other trace</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> BankNum<span class="hl opt">,</span> <span class="hl kwb">uint8_t</span> LEDNum<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Set return val to false as defualt</span>
+	<span class="hl kwb">bool</span> ReturnVal <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
+	<span class="hl slc">//If LEDNum &gt; 8 and Bank num  &gt; 2</span>
+	<span class="hl kwa">if</span><span class="hl opt">((</span>LEDNum<span class="hl opt">&gt;</span><span class="hl num">8</span><span class="hl opt">)||(</span>BankNum<span class="hl opt">&gt;</span><span class="hl num">2</span><span class="hl opt">))</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">//set returnVal to false</span>
+		ReturnVal <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
+		<span class="hl slc">//return</span>
+		<span class="hl kwa">return</span><span class="hl opt">(</span><span class="hl kwa">false</span><span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//End if</span>
+	<span class="hl slc">//Set return val to true</span>
+	ReturnVal <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span>
+	<span class="hl slc">//Get what is currently in the register</span>
+	<span class="hl kwb">uint32_t</span> NewSR24Value <span class="hl opt">=</span> <span class="hl kwd">SR24_GetCurrentRegister</span><span class="hl opt">();</span>
+	<span class="hl slc">//Create basemask variable (uint 32bit)</span>
+	<span class="hl kwb">uint32_t</span> BaseMask <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+	<span class="hl slc">//Select mask based on bank</span>
+	<span class="hl kwa">switch</span> <span class="hl opt">(</span>BankNum<span class="hl opt">){</span>
+		<span class="hl kwa">case</span> <span class="hl num">0</span><span class="hl opt">:</span>
+		BaseMask <span class="hl opt">=</span> BANK0_MASK<span class="hl opt">;</span>
+		<span class="hl kwa">break</span><span class="hl opt">;</span>
+		<span class="hl kwa">case</span> <span class="hl num">1</span><span class="hl opt">:</span>
+		BaseMask <span class="hl opt">=</span> BANK1_MASK<span class="hl opt">;</span>
+		<span class="hl kwa">break</span><span class="hl opt">;</span>
+		<span class="hl kwa">case</span> <span class="hl num">2</span><span class="hl opt">:</span>
+		BaseMask <span class="hl opt">=</span> BANK2_MASK<span class="hl opt">;</span>
+		<span class="hl kwa">break</span><span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Apply mask to register value to zero out the bank</span>
+	NewSR24Value <span class="hl opt">&amp;=</span> BaseMask<span class="hl opt">;</span>
+	<span class="hl slc">//if LEDNum &gt; 0</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>LEDNum <span class="hl opt">&gt;</span> <span class="hl num">0</span><span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">//Create a uint 32bit variable and make it 1</span>
+		<span class="hl kwb">uint32_t</span> LEDValue <span class="hl opt">=</span> <span class="hl num">1</span><span class="hl opt">;</span>
+		<span class="hl slc">//Shift the 1 left by banknum*8+LEDnum</span>
+		<span class="hl kwb">uint8_t</span> shiftval<span class="hl opt">;</span>
+		shiftval <span class="hl opt">= (</span>BankNum<span class="hl opt">*</span><span class="hl num">8</span><span class="hl opt">)+</span>LEDNum<span class="hl opt">-</span><span class="hl num">1</span><span class="hl opt">;</span>
+		LEDValue <span class="hl opt">=</span> LEDValue <span class="hl opt">&lt;&lt;</span> shiftval<span class="hl opt">;</span> 
+		<span class="hl slc">//OR with masked register value</span>
+		NewSR24Value <span class="hl opt">|=</span> LEDValue<span class="hl opt">;</span>
+		
+	<span class="hl opt">}</span>
+	<span class="hl slc">//end if	//call SR24_write to write value to shift register</span>
+	<span class="hl kwd">SR24_Write</span><span class="hl opt">(</span>NewSR24Value<span class="hl opt">);</span>
+	<span class="hl slc">//Return the return val</span>
+	<span class="hl kwa">return</span> <span class="hl opt">(</span>ReturnVal<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Meteor_ClearAll Function Description</span>
+<span class="hl com">	Arugments: None</span>
+<span class="hl com">	Returns: None</span>
+<span class="hl com">	Calls clear bank for each bank</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Write 0 to SR24</span>
+	<span class="hl kwb">uint32_t</span> Clear <span class="hl opt">=</span><span class="hl num">0</span><span class="hl opt">;</span>
+	<span class="hl kwd">SR24_Write</span><span class="hl opt">(</span>Clear<span class="hl opt">);</span>
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/******************************************************************************/</span>
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

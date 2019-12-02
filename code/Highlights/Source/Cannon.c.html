@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Cannon.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   Cannon.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This module reads the potentiometer, positions the cannon, vibrates the</span>
+<span class="hl com">   knob and lights up the tip LED on the cannnon. </span>
+<span class="hl com">   This module uses the Servo library for positioning the cannon. this module</span>
+<span class="hl com">   uses the AD library to read the potentiometer.</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> History</span>
+<span class="hl com"> When           Who     What/Why</span>
+<span class="hl com"> -------------- ---     --------</span>
+<span class="hl com"> 11/8/19 11:08  ram     initial release</span>
+<span class="hl com"> 11/11/19 21:07 ram		Added manual positioning function</span>
+<span class="hl com"> </span>
+<span class="hl com">****************************************************************************/</span>
+
+<span class="hl slc">// the common headers for C99 types </span>
+<span class="hl ppc">#include &lt;stdint.h&gt;</span>
+<span class="hl ppc">#include &lt;stdbool.h&gt;</span>
+
+<span class="hl slc">// the headers to access the GPIO subsystem</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">// the headers to access the TivaWare Library</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/sysctl.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/pin_map.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/timer.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/interrupt.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;termio.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;BITDEFS.H&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">//Libraries</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Servo.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ServoDefs.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ADMulti.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;PWM16Tiva.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">//Definitions</span>
+<span class="hl ppc">#define ALL_BITS (0xff&lt;&lt;2) </span>
+<span class="hl ppc">#define CANNON_IO_PORT HWREG(GPIO_PORTC_BASE+(GPIO_O_DATA+ALL_BITS))</span>
+
+<span class="hl ppc">#define LED_OFF BIT6LO</span>
+<span class="hl ppc">#define LED_ON BIT6HI</span>
+<span class="hl ppc">#define VIBE_OFF BIT7LO</span>
+<span class="hl ppc">#define VIBE_ON BIT7HI</span>
+<span class="hl ppc">#define READ_BUTTON(x) ((x &amp;BIT5HI)&gt;&gt;5)</span> <span class="hl slc">// will this work?</span>
+<span class="hl ppc"></span>
+<span class="hl ppc">#define ADC_COUNT_MASK 0x0000FFFF</span>
+
+<span class="hl com">/***Private Functions Prototypes***/</span>
+<span class="hl kwb">static uint16_t</span> <span class="hl kwd">TrimCount</span><span class="hl opt">(</span><span class="hl kwb">uint16_t</span> ADCount<span class="hl opt">);</span>
+<span class="hl kwb">static uint8_t</span> <span class="hl kwd">CalcPosition</span><span class="hl opt">(</span><span class="hl kwb">uint16_t</span> ADCount<span class="hl opt">);</span>
+
+<span class="hl com">/***Public Functions Prototypes***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Cannon_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+
+<span class="hl kwb">void</span> <span class="hl kwd">Cannon_LED</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">);</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Cannon_Vibrate</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">);</span>
+
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">Cannon_ReadButton</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">uint16_t</span> <span class="hl kwd">Cannon_GetPotValue</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">Cannon_UserPosition</span><span class="hl opt">(</span><span class="hl kwb">uint16_t</span> ADCount<span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Cannon_MoveToBank</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Bank<span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Cannon_ManualPosition</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> position<span class="hl opt">);</span>
+
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">QueryCannonPosition</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">QueryBankPositions</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Bank<span class="hl opt">);</span>
+
+
+
+<span class="hl com">/***Module Level Variables***/</span>
+<span class="hl kwb">static uint8_t</span> CannonPosition<span class="hl opt">;</span>
+<span class="hl kwb">static const uint8_t</span> BankPositions<span class="hl opt">[</span><span class="hl num">3</span><span class="hl opt">] =</span> 
+<span class="hl opt">{</span>
+	<span class="hl num">74</span><span class="hl opt">,</span> <span class="hl slc">//Left Bank</span>
+	<span class="hl num">50</span><span class="hl opt">,</span> <span class="hl slc">//Middle Bank</span>
+	<span class="hl num">27</span> <span class="hl slc">//Right Bank</span>
+<span class="hl opt">};</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Cannon_HWInit Function Description</span>
+<span class="hl com">	Arguements: None</span>
+<span class="hl com">	Returns nothing</span>
+<span class="hl com">	Intializes the output pins for controling the LED and vibration motor</span>
+<span class="hl com">	Intializes the input pin to read the button</span>
+<span class="hl com">	Intializes the pin to read the pot using ADC methods</span>
+<span class="hl com">	</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Cannon_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">// set up port C by enabling the peripheral clock, waiting for the </span>
+	<span class="hl slc">// peripheral to be ready and setting the direction</span>
+	<span class="hl slc">// of PC5 to input, PC6 &amp; PC7 to output</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>SYSCTL_RCGCGPIO<span class="hl opt">) |=</span> SYSCTL_RCGCGPIO_R2<span class="hl opt">;</span>
+	<span class="hl kwa">while</span><span class="hl opt">((</span><span class="hl kwd">HWREG</span><span class="hl opt">(</span>SYSCTL_PRGPIO<span class="hl opt">)&amp;</span>SYSCTL_PRGPIO_R2<span class="hl opt">) !=</span> SYSCTL_PRGPIO_R2<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Set PC6 and PC7 as digital outputs, PC5 as digital input</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTC_BASE<span class="hl opt">+</span>GPIO_O_DEN<span class="hl opt">) |= (</span>BIT5HI<span class="hl opt">|</span>BIT6HI<span class="hl opt">|</span>BIT7HI<span class="hl opt">);</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTC_BASE<span class="hl opt">+</span>GPIO_O_DIR<span class="hl opt">) |= (</span>BIT6HI<span class="hl opt">|</span>BIT7HI<span class="hl opt">);</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTC_BASE<span class="hl opt">+</span>GPIO_O_DIR<span class="hl opt">) &amp;=</span> BIT5LO<span class="hl opt">;</span>
+  
+  <span class="hl slc">//Enable Pull-up on PC5</span>
+  <span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTC_BASE<span class="hl opt">+</span>GPIO_O_PUR<span class="hl opt">) |=</span> BIT5HI<span class="hl opt">;</span>
+  
+  <span class="hl slc">//Cofigure open-drain on PC6 &amp; PC7</span>
+  <span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTF_BASE<span class="hl opt">+</span>GPIO_O_ODR<span class="hl opt">) |= (</span>BIT6HI<span class="hl opt">|</span>BIT7HI<span class="hl opt">);</span>
+  
+  <span class="hl slc">//Turn everything off</span>
+  CANNON_IO_PORT <span class="hl opt">&amp;=</span> LED_OFF<span class="hl opt">;</span>
+  CANNON_IO_PORT <span class="hl opt">&amp;=</span> VIBE_OFF<span class="hl opt">;</span>
+	
+	<span class="hl slc">// setup the analog system to read one channel (PE4)</span>
+	<span class="hl kwd">ADC_MultiInit</span><span class="hl opt">(</span><span class="hl num">1</span><span class="hl opt">);</span>
+  
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Cannon_LED Function Description</span>
+<span class="hl com">	Arguements: state (on or off)</span>
+<span class="hl com">		NOTE: Use &quot;On&quot; or &quot;Off&quot;. These are enums defined in the header</span>
+<span class="hl com">	Returns nothing</span>
+<span class="hl com">	If argument is on -&gt; turn on LED</span>
+<span class="hl com">	If argument is off -&gt; turn off LED</span>
+<span class="hl com">	</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Cannon_LED</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//If state = ON</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> On<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">// Set pin High</span>
+		CANNON_IO_PORT <span class="hl opt">|=</span> LED_ON<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Else if state = OFF</span>
+	<span class="hl kwa">else if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> Off<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">// Set pin low</span>
+		CANNON_IO_PORT <span class="hl opt">&amp;=</span> LED_OFF<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//end if</span>
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Cannon_Vibrate Function Description</span>
+<span class="hl com">	Arguements: state (on or off)</span>
+<span class="hl com">		NOTE: Use &quot;On&quot; or &quot;Off&quot;. These are enums defined in the header</span>
+<span class="hl com">	Returns nothing</span>
+<span class="hl com">	If argument is on -&gt; turn on vibration</span>
+<span class="hl com">	If argument is off -&gt; turn off vibration</span>
+<span class="hl com">	</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Cannon_Vibrate</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//If state = ON</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> On<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">// Set pin High</span>
+		CANNON_IO_PORT <span class="hl opt">|=</span> VIBE_ON<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Else if state = OFF</span>
+	<span class="hl kwa">else if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> Off<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">// Set pin low</span>
+		CANNON_IO_PORT <span class="hl opt">&amp;=</span> VIBE_OFF<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//end if</span>
+	<span class="hl kwa">return</span><span class="hl opt">;</span> 
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Cannon_ReadButton Function Description</span>
+<span class="hl com">	Arguements: none</span>
+<span class="hl com">	Returns 1 if pin high, 0 if low</span>
+<span class="hl com">	Reads PC5</span>
+<span class="hl com"></span>
+<span class="hl com">***/</span>
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">Cannon_ReadButton</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl kwb">uint8_t</span> CannonButtonVal<span class="hl opt">;</span>
+	<span class="hl slc">//Read the button pin</span>
+	CannonButtonVal <span class="hl opt">=</span> CANNON_IO_PORT<span class="hl opt">;</span>
+	CannonButtonVal <span class="hl opt">=</span> <span class="hl kwd">READ_BUTTON</span><span class="hl opt">(</span>CannonButtonVal<span class="hl opt">);</span>
+	<span class="hl slc">//return pin value</span>
+	<span class="hl kwa">return</span> CannonButtonVal<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Cannon_GetPotValue Function Description</span>
+<span class="hl com">	Arguements: None</span>
+<span class="hl com">	Returns ADC Count</span>
+<span class="hl com">	Reads the voltage at the pot sweep, trims it, and returns the trimmed</span>
+<span class="hl com">	value for further use</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">uint16_t</span> <span class="hl kwd">Cannon_GetPotValue</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Intialize array to get count</span>
+	<span class="hl kwb">uint32_t</span> ADC_Results<span class="hl opt">[</span><span class="hl num">1</span><span class="hl opt">];</span>
+	<span class="hl slc">//Get ADC count and store to array</span>
+	<span class="hl kwd">ADC_MultiRead</span><span class="hl opt">(</span>ADC_Results<span class="hl opt">);</span>
+	<span class="hl slc">//Isolate the count and store to int</span>
+	<span class="hl kwb">uint32_t</span> count32 <span class="hl opt">=</span> ADC_Results<span class="hl opt">[</span><span class="hl num">0</span><span class="hl opt">];</span>
+	count32 <span class="hl opt">&amp;=</span> ADC_COUNT_MASK<span class="hl opt">;</span>
+	<span class="hl kwb">uint16_t</span> CountVal <span class="hl opt">= (</span><span class="hl kwb">uint16_t</span><span class="hl opt">)</span>count32<span class="hl opt">;</span>
+	<span class="hl slc">//Call TrimCount</span>
+	CountVal <span class="hl opt">=</span> <span class="hl kwd">TrimCount</span><span class="hl opt">(</span>CountVal<span class="hl opt">);</span>
+	<span class="hl slc">// return the count</span>
+	<span class="hl kwa">return</span> <span class="hl opt">(</span>CountVal<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+
+<span class="hl com">/***</span>
+<span class="hl com">Cannon_UserPosition Function Description</span>
+<span class="hl com">	Arguments: Cannon Position Value</span>
+<span class="hl com">	returns status</span>
+<span class="hl com">	Takes the count value, converts it to a servo tick value and then sends</span>
+<span class="hl com">	the tick count to the servo library</span>
+<span class="hl com">  Updates current cannon position</span>
+<span class="hl com">	NOTE: This function is to be used for any analog movement. </span>
+<span class="hl com">***/</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">Cannon_UserPosition</span><span class="hl opt">(</span><span class="hl kwb">uint16_t</span> ADCcount<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Convert ADC count to position</span>
+	<span class="hl kwb">uint8_t</span> position<span class="hl opt">;</span>
+	position <span class="hl opt">=</span> <span class="hl kwd">CalcPosition</span><span class="hl opt">(</span>ADCcount<span class="hl opt">);</span>
+	<span class="hl slc">//Call Servo_MoveCannon and give it the position</span>
+	<span class="hl kwb">bool</span> PWMStatus<span class="hl opt">;</span>
+	PWMStatus <span class="hl opt">=</span> <span class="hl kwd">Servo_MoveCannon</span><span class="hl opt">(</span>position<span class="hl opt">);</span>
+	<span class="hl slc">//If movement successful</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>PWMStatus<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">//update CannonPosition var</span>
+		CannonPosition <span class="hl opt">=</span> position<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//end if</span>
+	<span class="hl slc">//Return status of PWM function</span>
+	<span class="hl kwa">return</span> <span class="hl opt">(</span>PWMStatus<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Cannon_MoveToBank Function Description</span>
+<span class="hl com">	Arguments: Bank Index</span>
+<span class="hl com">	returns status</span>
+<span class="hl com">	Takes the Bank index, finds the servo position associated with said bank</span>
+<span class="hl com">  and moves the cannon to the bank.</span>
+<span class="hl com">  Updates current cannon position</span>
+<span class="hl com">	NOTE: This function is to be used for bank-to-bank movement. </span>
+<span class="hl com">***/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Cannon_MoveToBank</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Bank<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Set status to false</span>
+	<span class="hl kwb">bool</span> PWMStatus <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
+	<span class="hl slc">//If bank &lt; 3</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>Bank <span class="hl opt">&lt;</span><span class="hl num">3</span><span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">//Get bank position value</span>
+    <span class="hl kwb">uint8_t</span> position<span class="hl opt">;</span>
+		position <span class="hl opt">=</span> BankPositions<span class="hl opt">[</span>Bank<span class="hl opt">];</span>
+		<span class="hl slc">//Call Servo_MoveCannon with bank position</span>
+		PWMStatus <span class="hl opt">=</span> <span class="hl kwd">Servo_MoveCannon</span><span class="hl opt">(</span>position<span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+  	<span class="hl slc">//If movement successful</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>PWMStatus<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">//update CannonPosition var</span>
+		CannonPosition <span class="hl opt">=</span> BankPositions<span class="hl opt">[</span>Bank<span class="hl opt">];</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//end if</span>
+	
+	<span class="hl slc">//return status</span>
+	<span class="hl kwa">return</span> <span class="hl opt">(</span>PWMStatus<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Cannon_ManualPosition Function Description</span>
+<span class="hl com">	Arguments: position (0-100)</span>
+<span class="hl com">	returns status</span>
+<span class="hl com">	Takes a servo count value and moves the cannon to that servo count</span>
+<span class="hl com">	Updates current cannon position</span>
+<span class="hl com">	NOTE: This function is to be used for sweeping movement. </span>
+<span class="hl com">***/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Cannon_ManualPosition</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> position<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">// Call servo function</span>
+	<span class="hl kwb">bool</span> status<span class="hl opt">;</span>
+	status <span class="hl opt">=</span> <span class="hl kwd">Servo_MoveCannon</span><span class="hl opt">(</span>position<span class="hl opt">);</span>
+	
+	<span class="hl kwa">if</span><span class="hl opt">(</span>status<span class="hl opt">)</span><span class="hl slc">// Update position count if successful</span>
+	<span class="hl opt">{</span>
+		CannonPosition <span class="hl opt">=</span> position<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//return status</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>status<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">QueryCannonPosition</span>
+<span class="hl com">  Arguments: none</span>
+<span class="hl com">  returns module level variable CannonPosition</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">QueryCannonPosition</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl kwa">return</span> <span class="hl opt">(</span>CannonPosition<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">QueryBankPositions</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Bank<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwb">int8_t</span> PosValue<span class="hl opt">;</span>
+  <span class="hl kwa">if</span><span class="hl opt">(</span>Bank<span class="hl opt">&gt;</span><span class="hl num">2</span><span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    PosValue <span class="hl opt">=</span> <span class="hl num">0xFF</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+  <span class="hl kwa">else</span>
+  <span class="hl opt">{</span>
+    PosValue <span class="hl opt">=</span> BankPositions<span class="hl opt">[</span>Bank<span class="hl opt">];</span>
+  <span class="hl opt">}</span>
+  <span class="hl kwa">return</span><span class="hl opt">(</span>PosValue<span class="hl opt">);</span>
+  
+<span class="hl opt">}</span>
+<span class="hl com">/******************************************************************************/</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Cannon_TrimCount Function Description</span>
+<span class="hl com">	Arguments: ADCcount</span>
+<span class="hl com">	Returns trimmed count</span>
+<span class="hl com">	Takes the count value and adjusts it to match thresholds if value exceeds</span>
+<span class="hl com">	NOTE: This function is to be used for any analog movement. </span>
+<span class="hl com">***/</span>
+<span class="hl kwb">static uint16_t</span> <span class="hl kwd">TrimCount</span><span class="hl opt">(</span><span class="hl kwb">uint16_t</span> ADCount<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl kwb">uint16_t</span> TrimmedValue<span class="hl opt">;</span>
+	<span class="hl slc">//If value is above higher threshold, set value to upper threshold</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>ADCount <span class="hl opt">&gt;</span> COUNT_UPPER_LIM<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		TrimmedValue <span class="hl opt">=</span> COUNT_UPPER_LIM<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//If value is below lower threshold, set value to lower threshold</span>
+	<span class="hl kwa">else if</span><span class="hl opt">(</span>ADCount <span class="hl opt">&lt;</span> COUNT_LOWER_LIM<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		TrimmedValue <span class="hl opt">=</span> COUNT_LOWER_LIM<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+  <span class="hl kwa">else</span>
+  <span class="hl opt">{</span>
+    	TrimmedValue <span class="hl opt">=</span> ADCount<span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+	<span class="hl slc">//return value</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>TrimmedValue<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">static uint8_t</span> <span class="hl kwd">CalcPosition</span><span class="hl opt">(</span><span class="hl kwb">uint16_t</span> ADCount<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl kwb">double</span> countRange<span class="hl opt">;</span>
+	countRange <span class="hl opt">=</span> COUNT_UPPER_LIM <span class="hl opt">-</span> COUNT_LOWER_LIM<span class="hl opt">;</span>
+	<span class="hl kwb">double</span> offset <span class="hl opt">=</span> COUNT_LOWER_LIM<span class="hl opt">;</span>
+	<span class="hl slc">//Figure out count ratio</span>
+	<span class="hl kwb">double</span> ratio<span class="hl opt">;</span>
+	ratio <span class="hl opt">= ((</span><span class="hl kwb">float</span><span class="hl opt">)</span>ADCount<span class="hl opt">-</span>offset<span class="hl opt">)/(</span>countRange<span class="hl opt">);</span>
+
+	<span class="hl slc">//Determine tick count based on ratio</span>
+	<span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">;</span>
+	ServoCount <span class="hl opt">=</span> ratio<span class="hl opt">*</span><span class="hl num">100</span><span class="hl opt">;</span> 
+	
+	<span class="hl slc">//return tick count</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>ServoCount<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+	
+<span class="hl slc">//----------------------------------End File------------------------------------//</span>
+
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

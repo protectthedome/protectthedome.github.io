@@ -1,0 +1,21 @@
+//Pseudocode for ResetService.c
+
+RunResetService -
+
+If Event is Tot_Inserted
+	Init timer
+else if Event is New_Pot_Value
+	Init timer
+else if Event is Airflow_Plugged
+	Init timer
+else if Event is Falling_Edge
+	Init timer
+else if Event is Rising_Edge
+	Init timer
+else if Event is Cannon_Button_Down
+	Init timer
+else if Event is End_Of_Game
+	Stop timer
+else if Event is ES_Timeout
+	Post RST event
+	Post Go_Welcome_Mode event

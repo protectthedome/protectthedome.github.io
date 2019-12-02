@@ -1,0 +1,27 @@
+//Pseudocode for GlobalTimer.c
+
+RunGlobalTimer -
+
+If CurrentSMState is NotPlayingGT
+	If Event is Tot_Inserted
+		Init timer
+		Move servo to beginning
+		Set CurrentSMState to PlayingGT
+
+else if CurrentSMState is PlayingGT
+	If Event is RST or End_Of_Game
+		Move servo to beginning
+		Set CurrentSMState to NotPlayingGT
+		Stop timer
+	else if Event is ES_Timeout
+		if (counter < MAXCOUNT)
+			Increment counter
+			Move servo
+			Init timer
+		else
+			Post Global_Time_Out event
+			Set CurrentSMState to NotPlayingGT
+			Move servo to beginning
+
+
+		

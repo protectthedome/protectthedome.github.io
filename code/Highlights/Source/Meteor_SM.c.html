@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Meteor_SM.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   Meteor_SM.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This is the meteor service under the</span>
+<span class="hl com">   Gen2 Events and Services Framework.</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl com">/*----------------------------- Include Files -----------------------------*/</span>
+<span class="hl com">/* include header files for this service</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include &lt;stdio.h&gt; </span>
+<span class="hl ppc">#include &lt;stdlib.h&gt; </span>
+<span class="hl ppc">#include &lt;math.h&gt;</span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Meteor_SM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include &lt;string.h&gt;</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Meteor.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon_SM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ArcadeFSM.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl com">/* include header files for hardware access</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl com">/* include header files for the framework</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Configure.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Framework.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_DeferRecall.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_ShortTimer.h&quot;</span><span class="hl ppc"></span>
+
+
+
+
+<span class="hl com">/*----------------------------- Module Defines ----------------------------*/</span>
+<span class="hl slc">// these times assume a 1.000mS/tick timing</span>
+<span class="hl ppc">#define ONE_SEC 1000</span>
+<span class="hl ppc">#define HALF_SEC (ONE_SEC/2)</span>
+<span class="hl ppc">#define TWO_SEC (ONE_SEC*2)</span>
+<span class="hl ppc">#define FIVE_SEC (ONE_SEC*5)</span>
+<span class="hl ppc">#define DESTROYED_DELAY 100</span>
+<span class="hl ppc">#define FALL_TIME 1000-(150*(MachineCounter-1))</span>
+<span class="hl ppc">#define BLINK_COUNT_MAX 7</span>
+
+<span class="hl slc">//Percentage error allowance (on one side) for cannon localization</span>
+<span class="hl ppc">#define ERROR 5</span>
+<span class="hl ppc">#define MAX_COUNT 8</span>
+
+<span class="hl com">/*---------------------------- Module Functions ---------------------------*/</span>
+<span class="hl com">/* prototypes for private functions for this service.They should be functions</span>
+<span class="hl com">   relevant to the behavior of this service</span>
+<span class="hl com">*/</span>
+<span class="hl kwb">static uint8_t</span> <span class="hl kwd">RandomNext</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">static uint8_t</span> <span class="hl kwd">GetStartingBank</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+
+<span class="hl com">/*---------------------------- Module Variables ---------------------------*/</span>
+<span class="hl slc">// with the introduction of Gen2, we need a module level Priority variable</span>
+<span class="hl kwb">static uint8_t</span> MyPriority<span class="hl opt">;</span>
+<span class="hl kwb">static</span> Meteor_SMState_t CurrentSMState<span class="hl opt">;</span>
+<span class="hl kwb">static uint16_t</span> counter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+<span class="hl kwb">static uint8_t</span> BankNum <span class="hl opt">=</span> <span class="hl num">3</span><span class="hl opt">;</span> <span class="hl slc">//Initialize to an invalid LED bank</span>
+<span class="hl kwb">static uint8_t</span> blinkcount <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+<span class="hl kwb">static uint8_t</span> MachineCounter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+
+<span class="hl slc">// add a deferral queue for up to 3 pending deferrals +1 to allow for overhead</span>
+<span class="hl kwb">static</span> ES_Event_t DeferralQueue<span class="hl opt">[</span><span class="hl num">3</span><span class="hl opt">+</span><span class="hl num">1</span><span class="hl opt">];</span>
+
+<span class="hl com">/*------------------------------ Module Code ------------------------------*/</span>
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     InitMeteor_SM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     uint8_t : the priorty of this service</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool, false if error in initialization, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Saves away the priority, and does any </span>
+<span class="hl com">     other required initialization for this service</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     J. Edward Carryer, 01/16/12, 10:00</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">InitMeteor_SM</span> <span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  MyPriority <span class="hl opt">=</span> Priority<span class="hl opt">;</span>
+  
+  <span class="hl slc">//Initialize meteor hardware</span>
+  <span class="hl kwd">Meteor_HWInit</span><span class="hl opt">();</span>
+  
+  <span class="hl slc">//Set SM currentstate</span>
+  CurrentSMState <span class="hl opt">=</span> Idle_M<span class="hl opt">;</span>
+  
+  
+  <span class="hl kwa">return true</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+
+
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     PostMeteor_SM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     EF_Event ThisEvent ,the event to post to the queue</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool false if the Enqueue operation failed, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Posts an event to this state machine&#39;s queue</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     J. Edward Carryer, 10/23/11, 19:25</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">PostMeteor_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwa">return</span> <span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span> MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">    RunMeteor_SM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">   ES_Event_t : the event to process</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">   ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   add your description here</span>
+<span class="hl com"> Notes</span>
+<span class="hl com">   </span>
+<span class="hl com"> Author</span>
+<span class="hl com">   J. Edward Carryer, 01/15/12, 15:23</span>
+<span class="hl com">****************************************************************************/</span>
+ES_Event_t <span class="hl kwd">RunMeteor_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  ES_Event_t NewEvent<span class="hl opt">;</span>
+  ES_Event_t ReturnEvent<span class="hl opt">;</span>
+  ReturnEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_NO_EVENT<span class="hl opt">;</span>
+  
+  <span class="hl kwa">switch</span> <span class="hl opt">(</span>CurrentSMState<span class="hl opt">) {</span>
+    <span class="hl kwa">case</span> Idle_M<span class="hl opt">:</span> 
+	<span class="hl slc">//If event is begin meteor interaction</span>
+	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Meteor<span class="hl opt">) {</span>
+		<span class="hl slc">//Reset count</span>
+		counter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+    
+		<span class="hl slc">//Init timer</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>METEOR_TIMER<span class="hl opt">,</span> FALL_TIME<span class="hl opt">);</span>
+		<span class="hl slc">//Get &quot;random&quot; number</span>
+    <span class="hl kwa">if</span><span class="hl opt">(</span>MachineCounter <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl opt">)</span>
+    <span class="hl opt">{</span>
+    <span class="hl slc">//BankNum = ES_Timer_GetTime() % 3;</span>
+      BankNum <span class="hl opt">=</span> <span class="hl kwd">GetStartingBank</span><span class="hl opt">();</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">else</span>
+    <span class="hl opt">{</span>
+      BankNum <span class="hl opt">=</span> <span class="hl kwd">RandomNext</span><span class="hl opt">();</span>
+    <span class="hl opt">}</span>
+    <span class="hl slc">//printf(&quot;\rBankNum: %u\r\n&quot;, BankNum);</span>
+		<span class="hl slc">//Turn on top LED of bank</span>
+		<span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>BankNum<span class="hl opt">,</span> counter <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">);</span>
+		<span class="hl slc">//Update current state</span>
+		CurrentSMState <span class="hl opt">=</span> MeteorFalling<span class="hl opt">;</span>
+    <span class="hl slc">//Increment Machine counter</span>
+    <span class="hl slc">//printf(&quot;\rMeteor MachineCounter: %u\r\n&quot;, MachineCounter);</span>
+    MachineCounter<span class="hl opt">++;</span>
+    
+	<span class="hl opt">}</span>
+  <span class="hl kwa">else if</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> End_Of_Game <span class="hl opt">||</span> ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> RST<span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    MachineCounter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+    <span class="hl slc">//printf(&quot;\rMeteor MachineCounter: %u\r\n&quot;, MachineCounter);</span>
+  <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+	<span class="hl kwa">case</span> MeteorFalling<span class="hl opt">:</span>
+	<span class="hl slc">//Check for reset or end of game event</span>
+	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> RST <span class="hl opt">||</span> ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> End_Of_Game<span class="hl opt">) {</span>
+		<span class="hl slc">//Update current state</span>
+		CurrentSMState <span class="hl opt">=</span> Idle_M<span class="hl opt">;</span>
+		<span class="hl slc">//Reset counter</span>
+		counter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+		<span class="hl slc">//Clear all LEDs</span>
+		<span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+		<span class="hl slc">//Reset BankNum</span>
+		BankNum <span class="hl opt">=</span> <span class="hl num">3</span><span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//else if cannon button down</span>
+	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Cannon_Button_Down<span class="hl opt">) {</span>
+		<span class="hl slc">//Check guard condition, meteor in range</span>
+		<span class="hl kwb">uint8_t</span> CannonPos <span class="hl opt">=</span> <span class="hl kwd">QueryCannonPosition</span><span class="hl opt">();</span>
+		<span class="hl slc">//Get bank % position value</span>
+		<span class="hl kwb">uint8_t</span> BankValue <span class="hl opt">=</span> <span class="hl kwd">QueryBankPositions</span><span class="hl opt">(</span>BankNum<span class="hl opt">);</span>
+		 <span class="hl kwa">if</span> <span class="hl opt">((</span>CannonPos <span class="hl opt">&lt;</span> BankValue <span class="hl opt">+</span> ERROR<span class="hl opt">) &amp;&amp; (</span>CannonPos <span class="hl opt">&gt;</span> BankValue <span class="hl opt">-</span> ERROR<span class="hl opt">)) {</span>
+			<span class="hl slc">//Post meteor destroyed to Meteor SM and cannon SM</span>
+		  ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Meteor_Destroyed<span class="hl opt">;</span>
+      <span class="hl kwd">PostCannon_SM</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">);</span>
+      <span class="hl slc">//printf(&quot;\rI posted!\r\n&quot;);</span>
+      <span class="hl kwd">PostMeteor_SM</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">);</span>
+		<span class="hl opt">}</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//else if we get a timeout event</span>
+	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">) {</span>
+		<span class="hl slc">//If counter is less than max</span>
+		<span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">&lt;</span> MAX_COUNT<span class="hl opt">) {</span>
+		<span class="hl slc">//Increment counter</span>
+		counter<span class="hl opt">++;</span>
+		<span class="hl slc">//Decrement LED</span>
+		<span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>BankNum<span class="hl opt">,</span> counter <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">);</span>
+		<span class="hl slc">//Init timer</span>
+    <span class="hl slc">//printf(&quot;\rFall Time: %i\r\n&quot;, FALL_TIME);</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>METEOR_TIMER<span class="hl opt">,</span> FALL_TIME<span class="hl opt">);</span>
+		<span class="hl opt">}</span>
+		<span class="hl slc">//else we have reached max count</span>
+		<span class="hl kwa">else</span> <span class="hl opt">{</span>
+		<span class="hl slc">//Reset counter</span>
+		counter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+		<span class="hl slc">//Reset BankNum to invalid number</span>
+		<span class="hl slc">//BankNum = 3;</span>
+		<span class="hl slc">//Update state</span>
+		CurrentSMState <span class="hl opt">=</span> Idle_M<span class="hl opt">;</span>
+		<span class="hl slc">//Clear LEDs</span>
+		<span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+		<span class="hl slc">//Post end of game (game over)</span>
+		NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> End_Of_Game<span class="hl opt">;</span>
+		NewEvent<span class="hl opt">.</span>EventParam <span class="hl opt">=</span> GAME_OVER<span class="hl opt">;</span>
+		<span class="hl kwd">ES_PostAll</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+		<span class="hl opt">}</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Else if meteor is destroyed</span>
+	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Meteor_Destroyed<span class="hl opt">) {</span>
+		<span class="hl slc">//Reset counter</span>
+		<span class="hl slc">//counter = 0;</span>
+		<span class="hl slc">//Update state</span>
+		CurrentSMState <span class="hl opt">=</span> MeteorFlashing<span class="hl opt">;</span>
+    <span class="hl slc">//CurrentSMState = Idle_M;</span>
+    <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>METEOR_TIMER<span class="hl opt">,</span> DESTROYED_DELAY<span class="hl opt">);</span>
+    <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>BankNum<span class="hl opt">,</span> counter <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">);</span>
+		<span class="hl slc">//Clear all LEDs</span>
+		<span class="hl slc">//Meteor_ClearAll();</span>
+		<span class="hl slc">//Reset BankNum to invalid number</span>
+		<span class="hl slc">//BankNum = 3;</span>
+		<span class="hl slc">//Post interaction complete to Arcade SM</span>
+	
+	<span class="hl opt">}</span>
+	<span class="hl kwa">break</span><span class="hl opt">;</span>
+  <span class="hl kwa">case</span> MeteorFlashing<span class="hl opt">:</span>
+    <span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">) {</span>
+      <span class="hl slc">//printf(&quot;meteor timeout&quot;);</span>
+      <span class="hl kwa">if</span> <span class="hl opt">(</span>blinkcount <span class="hl opt">&lt;=</span> BLINK_COUNT_MAX<span class="hl opt">) {</span>
+        <span class="hl slc">//printf(&quot;1\r\n&quot;);</span>
+        <span class="hl slc">//we are still flashing</span>
+        <span class="hl kwa">if</span> <span class="hl opt">((</span>blinkcount <span class="hl opt">%</span> <span class="hl num">2</span><span class="hl opt">) ==</span> <span class="hl num">0</span><span class="hl opt">) {</span>
+          <span class="hl slc">//turn off</span>
+          <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>BankNum<span class="hl opt">,</span> <span class="hl num">0</span><span class="hl opt">);</span>
+        <span class="hl opt">}</span>
+        <span class="hl kwa">else</span> <span class="hl opt">{</span>
+          <span class="hl slc">//turn on</span>
+          <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>BankNum<span class="hl opt">,</span> counter <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">);</span>
+        <span class="hl opt">}</span>
+        blinkcount<span class="hl opt">++;</span>
+        <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>METEOR_TIMER<span class="hl opt">,</span> DESTROYED_DELAY<span class="hl opt">);</span>
+      <span class="hl opt">}</span>
+      <span class="hl kwa">else</span> <span class="hl opt">{</span>
+         <span class="hl slc">//printf(&quot;2&quot;);</span>
+        <span class="hl slc">//we are done flashing</span>
+        <span class="hl slc">//Reset counter</span>
+        counter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+        blinkcount <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+        <span class="hl slc">//Update state</span>
+        CurrentSMState <span class="hl opt">=</span> Idle_M<span class="hl opt">;</span>
+        <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+        <span class="hl slc">//Reset BankNum to invalid number</span>
+        <span class="hl slc">//BankNum = 3;</span>
+        NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Interaction_Completed<span class="hl opt">;</span>
+        <span class="hl kwd">PostArcadeFSM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+      <span class="hl opt">}</span>
+    <span class="hl opt">}</span>
+  <span class="hl kwa">break</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+ 
+  <span class="hl kwa">return</span> ReturnEvent<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***************************************************************************</span>
+<span class="hl com"> private functions</span>
+<span class="hl com"> ***************************************************************************/</span>
+
+<span class="hl kwb">static uint8_t</span> <span class="hl kwd">RandomNext</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwb">uint8_t</span> ReturnVal <span class="hl opt">=</span> <span class="hl num">0xFF</span><span class="hl opt">;</span> <span class="hl slc">//intialize</span>
+  <span class="hl slc">//Get System time</span>
+  <span class="hl kwb">uint16_t</span> SysTime <span class="hl opt">=</span> <span class="hl kwd">ES_Timer_GetTime</span><span class="hl opt">();</span>
+  <span class="hl slc">// See if value is odd or even</span>
+  <span class="hl kwb">uint8_t</span> odd <span class="hl opt">=</span> SysTime<span class="hl opt">%</span><span class="hl num">2</span><span class="hl opt">;</span>
+  <span class="hl slc">//Make decision about next bank num based current bankNum</span>
+  <span class="hl kwa">switch</span> <span class="hl opt">(</span>BankNum<span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwa">case</span> <span class="hl num">0</span><span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwa">if</span><span class="hl opt">(</span>odd<span class="hl opt">)</span>
+      <span class="hl opt">{</span>
+        ReturnVal <span class="hl opt">=</span> <span class="hl num">1</span><span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+      <span class="hl kwa">else</span>
+      <span class="hl opt">{</span>
+        ReturnVal <span class="hl opt">=</span> <span class="hl num">2</span><span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+      <span class="hl kwa">break</span><span class="hl opt">;</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">case</span> <span class="hl num">1</span><span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwa">if</span><span class="hl opt">(</span>odd<span class="hl opt">)</span>
+      <span class="hl opt">{</span>
+        ReturnVal <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+      <span class="hl kwa">else</span>
+      <span class="hl opt">{</span>
+        ReturnVal <span class="hl opt">=</span> <span class="hl num">2</span><span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+      <span class="hl kwa">break</span><span class="hl opt">;</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">case</span> <span class="hl num">2</span><span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwa">if</span><span class="hl opt">(</span>odd<span class="hl opt">)</span>
+      <span class="hl opt">{</span>
+        ReturnVal <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+      <span class="hl kwa">else</span>
+      <span class="hl opt">{</span>
+        ReturnVal <span class="hl opt">=</span> <span class="hl num">1</span><span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+      <span class="hl kwa">break</span><span class="hl opt">;</span>
+    <span class="hl opt">}</span>
+  <span class="hl opt">}</span>
+    <span class="hl slc">//Return value</span>
+    <span class="hl kwa">return</span><span class="hl opt">(</span>ReturnVal<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">static uint8_t</span> <span class="hl kwd">GetStartingBank</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Get current cannon position</span>
+	<span class="hl kwb">uint8_t</span> CannonPos <span class="hl opt">=</span> <span class="hl kwd">QueryCannonPosition</span><span class="hl opt">();</span>
+	<span class="hl slc">//find the distance from each bank</span>
+	<span class="hl kwb">uint8_t</span> Distances <span class="hl opt">[</span><span class="hl num">3</span><span class="hl opt">] = {</span><span class="hl num">0</span><span class="hl opt">,</span><span class="hl num">0</span><span class="hl opt">,</span><span class="hl num">0</span><span class="hl opt">};</span>
+	<span class="hl kwb">int8_t</span> index<span class="hl opt">,</span> diff<span class="hl opt">;</span>
+	<span class="hl kwa">for</span><span class="hl opt">(</span>index <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span> index <span class="hl opt">&lt;</span> <span class="hl num">3</span><span class="hl opt">;</span> index<span class="hl opt">++)</span>
+	<span class="hl opt">{</span>
+		diff <span class="hl opt">= (</span><span class="hl kwb">int8_t</span><span class="hl opt">)(</span>CannonPos <span class="hl opt">-</span> <span class="hl kwd">QueryBankPositions</span><span class="hl opt">(</span>index<span class="hl opt">));</span>
+		Distances<span class="hl opt">[</span>index<span class="hl opt">] =</span> <span class="hl kwd">abs</span><span class="hl opt">(</span>diff<span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//find the maximum distance</span>
+	<span class="hl kwb">uint8_t</span> MaxLoc <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span> 
+	<span class="hl slc">//Start loop, run 2 times</span>
+	<span class="hl kwa">for</span><span class="hl opt">(</span>index <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span> index<span class="hl opt">&lt;</span><span class="hl num">2</span><span class="hl opt">;</span> index<span class="hl opt">++)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">//compare n+1 to n</span>
+		<span class="hl slc">//if n+1 bigger, set max to n+1</span>
+		<span class="hl kwa">if</span><span class="hl opt">(</span>Distances<span class="hl opt">[</span>index<span class="hl opt">+</span><span class="hl num">1</span><span class="hl opt">] &gt;</span> Distances<span class="hl opt">[</span>index<span class="hl opt">])</span>
+		<span class="hl opt">{</span>
+			MaxLoc <span class="hl opt">=</span> index <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">;</span>
+		<span class="hl opt">}</span>
+		<span class="hl slc">//End if</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//End loop</span>
+	<span class="hl slc">//Return bank that is the farthest</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>MaxLoc<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+       
+<span class="hl com">/*------------------------------- Footnotes -------------------------------*/</span>
+<span class="hl com">/*------------------------------ End of file ------------------------------*/</span>
+
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

@@ -1,0 +1,123 @@
+/****************************************************************************
+Pseudo code for WelcomeFSM.c
+This module controls the behavior of the arcade in Welcome Mode!
+
+****************************************************************************/
+Include Headers and relevant Libraries
+
+Module defines
+  STEP_DELAY
+  LED_MOD
+
+Private module function prototypes
+  StepCannonGauge
+  StepLED
+
+Define module variables
+  CurrentState
+  MyPriority
+  DirectionFlag
+  counter
+
+Function InitWelcomeFSM
+Takes in Priority, returns success boolean
+
+  Set MyPriority to Priority
+  Set CurrentState to InitPState
+  Post initial transition event
+  Return true if successfully posted, false otherwise
+
+Function PostWelcomeFSM
+Takes in ThisEvent, return success boolean
+  Post ThisEvent to service corresponding to MyPriority
+  Return true if successful, false otherwise
+
+
+bool PostWelcomeFSM(ES_Event_t ThisEvent)
+{
+  return ES_PostToService(MyPriority, ThisEvent);
+}
+
+Function RunWelcomeFSM
+Takes in ThisEvent, returns nothing
+
+  Create event variable ReturnEvent of type ES_NO_EVENT
+  If CurrentState is InitPState
+    If ThisEvent is of type ES_INIT
+      Set CurrentState to Idle_W
+      Post Go_Welcome_Mode to RunWelcomeFSM
+    End If
+  Else If CurrentState is Idle_W
+    If ThisEvent is of type Go_Welcome_Mode
+      Set DirectionFlag to true (start moving CW)
+      Move the air and power gauges to empty
+      Move the cannon fully to the left
+      Turn all meteor LEDs off
+      Turn all crisis indicator LEDs off
+      Reset the Global timer
+      Set the CurrentState to Welcome
+      Start a time with STEP_DELAY
+    End If
+  Else If CurrentState is Welcome
+    If ThisEvent is of type Tot_Inserted
+      Turn off all meteor LEDs
+      Turn off all crisis indicator LEDs
+      Set CurrentState to Idle_W
+    Else If ThisEvent is of type ES_TIMEOUT
+      Turn off all LEDs
+      Call StepCannonGauge function
+      If counter mod LED_MOD is 0
+        Call StepLED function
+      End If
+      Start timer with STEP_DELAY
+      Increment counter by 1
+  End If
+  Return ReturnEvent
+
+Function QueryWelcomeState
+Takes nothing, return current state of FSM
+
+  Return CurrentState
+
+/***************************************************************************
+ private functions
+ ***************************************************************************/
+Function StepCannonGauge
+Takes no parameters, returns nothing
+
+  Create variable CurrentCannonPosition and set it equal to the current cannon position
+  Create vaariable NewCannonPosition and set it equal to CurrentCannonPosition
+  If DirectionFlag is true
+    If CurrentCannonPosition is 100 (it's max value)
+      Set DirectionFlag to false (should move CCW next)
+      Decrement NewCannonPosition by 1
+      Move cannon, air gauge, and power gauge to NewCannonPosition
+    Else
+      Increment NewCannonPosition by 1
+      Move cannon, air gauge, and power gauge to NewCannonPosition
+    Else If
+  Else
+    If CurrentCannonPosition is 0 (it's min value)
+      Set DirectionFlag to true (should move CW next)
+      Increment NewCannonPosition by 1
+      Move cannon, air gauge, and power gauge to NewCannonPosition
+    Else
+      Decrement NewCannonPosition by 1
+      Move cannon, air gauge, and power gauge to NewCannonPosition
+    End If
+  End If
+
+Function StepLED
+Takes in no parameters, returns nothing
+
+  Create static variables Bank0LED, Bank1LED, Bank2LED
+  If counter is 0
+    Set Bank0LED to 1
+    Set Bank1LED to 2
+    Set Bank2LED to 3
+  End If
+  Set bank 0 to have LED corresponding to Bank0LED on
+  Set bank 1 to have LED corresponding to Bank1LED on
+  Set bank 2 to have LED corresponding to Bank2LED on
+
+  Mod Bank0LED, Bank1LED, Bank2LED by number of LEDs per bank and increment by 1

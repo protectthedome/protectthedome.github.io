@@ -1,0 +1,72 @@
+/**********
+Pseudo code for the AirLeak Library.
+This module controls the 3 fans, reads the 3 hall switches and moves the oxygen
+gauge.
+***********/
+
+Include headers
+Include Libraries needed (ShiftRegisterWrite.h and Servo.h)
+Define public functions prototypes
+  AirLeak_Init
+  AirLeak_FanControl
+  AirLeak_QueryFanState
+  AirLeak_ReadHallSensors
+  AirLeak_MoveGauge
+
+Define module variables
+  GaugePosition
+
+Initialization function: AirLeak_Init (no param)
+  Initialize shift register
+  Write 0 on shift register
+  Turn on PORTD
+  Initialize ports PD1, PD2, PD3 as digital inputs
+  Enable internal Pull-ups on ports
+End of Initialization function
+
+Function: AirLeak_FanControl (param: WhichFan, FanState)
+  if WhichFan is an invalid fan number
+    return false
+  Endif
+  Create variable FanValue, a 8 bit uint with 1 in the LSB
+  Shift FanValue for the given fan selection (WhichFan)
+  Read current value on shift register
+  Create variable for New shift register value (NewRegisterValue)
+  If FanState is On
+    Update current shift register value considering FanValue (OR operation), save it on NewRegisterValue
+  Else if FanState is Off
+    Invert value of FanValue bitwise
+     Update current shift register value considering FanValue (AND operation), save it on NewRegisterValue
+  Endif
+  Write NewRegisterValue to shift register
+  Return true
+End function
+
+Function: AirLeak_ReadHallSensors (param: Data)
+  Read port D, save value in variable HallValls
+  Mask HallValls to obtain Hall sensors values
+  For every Hall sensor
+    Mask HallVals with BIT1HI and save it in Data pointer
+    Increment Data pointer
+    Shift HallVals 1 to the right
+  End For
+End function
+
+
+Function: AirLeak_MoveGauge(param: position)
+  Call Servo function Servo_MoveO2Gauge with parameter "100-position", save boolean returned as Status
+  If Status is true
+    Save on GaugePosition the new position
+  End if
+  Return Status
+End function
+
+Function: AirLeak_QueryGauge (no param)
+	return GaugePosition
+End function
+
+Function: AirLeak_QueryFanState (param: WhichFan)
+  Get current shift register value (CurrentRegisterValue)
+  Shift CurrentRegisterValue by WhichFan
+  Return LSB of CurrentRegisterValue
+End function

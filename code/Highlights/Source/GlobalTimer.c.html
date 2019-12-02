@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>GlobalTimer.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   GlobalTimer.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This is the global timer service</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl com">/*----------------------------- Include Files -----------------------------*/</span>
+<span class="hl com">/* include header files for this service</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;GlobalTimer.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Servo.h&quot;</span><span class="hl ppc"></span>
+
+
+<span class="hl com">/* include header files for hardware access</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl com">/* include header files for the framework</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Configure.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Framework.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_DeferRecall.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_ShortTimer.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ArcadeFSM.h&quot;</span><span class="hl ppc"></span>
+
+
+
+
+<span class="hl com">/*----------------------------- Module Defines ----------------------------*/</span>
+<span class="hl slc">// these times assume a 1.000mS/tick timing</span>
+<span class="hl ppc">#define ONE_SEC 1000</span>
+<span class="hl ppc">#define HALF_SEC (ONE_SEC/2)</span>
+<span class="hl ppc">#define TWO_SEC (ONE_SEC*2)</span>
+<span class="hl ppc">#define FIVE_SEC (ONE_SEC*5)</span>
+
+<span class="hl ppc">#define MAX_COUNT 100</span>
+<span class="hl slc">//Tune the following two values to span proper servo range</span>
+<span class="hl ppc">#define BEGINNING_TIME 0</span>
+<span class="hl ppc">#define END_TIME 100</span>
+<span class="hl ppc">#define DeltaTime 600</span>
+
+<span class="hl com">/*---------------------------- Module Functions ---------------------------*/</span>
+<span class="hl com">/* prototypes for private functions for this service.They should be functions</span>
+<span class="hl com">   relevant to the behavior of this service</span>
+<span class="hl com">*/</span>
+
+
+<span class="hl com">/*---------------------------- Module Variables ---------------------------*/</span>
+<span class="hl slc">// with the introduction of Gen2, we need a module level Priority variable</span>
+<span class="hl kwb">static uint16_t</span> counter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+<span class="hl kwb">static uint8_t</span> MyPriority<span class="hl opt">;</span>
+<span class="hl kwb">static</span> GlobalTimerState_t CurrentSMState<span class="hl opt">;</span>
+<span class="hl kwb">static uint8_t</span> CurrentTimePercentage <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+
+<span class="hl slc">// add a deferral queue for up to 3 pending deferrals +1 to allow for overhead</span>
+<span class="hl kwb">static</span> ES_Event_t DeferralQueue<span class="hl opt">[</span><span class="hl num">3</span><span class="hl opt">+</span><span class="hl num">1</span><span class="hl opt">];</span>
+
+<span class="hl com">/*------------------------------ Module Code ------------------------------*/</span>
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     InitGlobalTimer</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     uint8_t : the priorty of this service</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool, false if error in initialization, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Saves away the priority, and does any </span>
+<span class="hl com">     other required initialization for this service</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     T. Weber</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">InitGlobalTimer</span> <span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  MyPriority <span class="hl opt">=</span> Priority<span class="hl opt">;</span>
+  
+  <span class="hl slc">//Initialize State</span>
+  CurrentSMState <span class="hl opt">=</span> NotPlaying_GT<span class="hl opt">;</span>
+  
+  <span class="hl kwa">return true</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+
+
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     PostGlobalTimer</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     EF_Event ThisEvent ,the event to post to the queue</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool false if the Enqueue operation failed, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Posts an event to this state machine&#39;s queue</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     J. Edward Carryer, 10/23/11, 19:25</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">PostGlobalTimer</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwa">return</span> <span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span> MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">    RunGlobalTimer</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">   ES_Event_t : the event to process</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">   ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   add your description here</span>
+<span class="hl com"> Notes</span>
+<span class="hl com">   </span>
+<span class="hl com"> Author</span>
+<span class="hl com">   T. Weber</span>
+<span class="hl com">****************************************************************************/</span>
+ES_Event_t <span class="hl kwd">RunGlobalTimer</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  ES_Event_t NewEvent<span class="hl opt">;</span>
+  ES_Event_t ReturnEvent<span class="hl opt">;</span>
+  ReturnEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_NO_EVENT<span class="hl opt">;</span>
+  
+  <span class="hl kwa">switch</span> <span class="hl opt">(</span>CurrentSMState<span class="hl opt">) {</span>
+    <span class="hl kwa">case</span> NotPlaying_GT<span class="hl opt">:</span> 
+	<span class="hl slc">//If TOT is inserted</span>
+	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Tot_Inserted<span class="hl opt">) {</span>
+		<span class="hl slc">//Initialize Timer</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>GLOBAL_TIMER<span class="hl opt">,</span> DeltaTime<span class="hl opt">);</span>
+		<span class="hl slc">//Move time display to beginning</span>
+		<span class="hl kwd">Servo_MoveTimer</span><span class="hl opt">(</span>BEGINNING_TIME<span class="hl opt">);</span>
+		<span class="hl slc">//Reset counter</span>
+		counter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+		<span class="hl slc">//Reset time</span>
+		 CurrentTimePercentage <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+		<span class="hl slc">//Set next state</span>
+		CurrentSMState <span class="hl opt">=</span> Playing_GT<span class="hl opt">;</span>
+			<span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+    <span class="hl kwa">case</span> Playing_GT<span class="hl opt">:</span>
+	<span class="hl slc">//If reset event or end of game event</span>
+	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> RST <span class="hl opt">||</span> ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> End_Of_Game<span class="hl opt">) {</span>
+    <span class="hl slc">//Reset counter</span>
+		counter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+		<span class="hl slc">//Reset time</span>
+		 CurrentTimePercentage <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+    <span class="hl kwd">Servo_MoveTimer</span><span class="hl opt">(</span>BEGINNING_TIME<span class="hl opt">);</span>
+    <span class="hl kwd">ES_Timer_StopTimer</span><span class="hl opt">(</span>GLOBAL_TIMER<span class="hl opt">);</span>
+		CurrentSMState <span class="hl opt">=</span> NotPlaying_GT<span class="hl opt">;</span>
+		<span class="hl opt">}</span>
+		<span class="hl slc">//Or if we receive a timeout event</span>
+		<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">) {</span>
+      
+			<span class="hl slc">//If count is max</span>
+			<span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">&gt;=</span> MAX_COUNT<span class="hl opt">) {</span>
+        <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">MAXED&quot;</span><span class="hl opt">);</span>
+				<span class="hl slc">//Post a timeout event to Arcade_SM</span>
+				NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Global_Time_Out<span class="hl opt">;</span>
+				<span class="hl kwd">PostArcadeFSM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+				<span class="hl slc">//Set SM state</span>
+				CurrentSMState <span class="hl opt">=</span> NotPlaying_GT<span class="hl opt">;</span> 
+				<span class="hl opt">}</span>
+			<span class="hl slc">//Otherwise, increment counter</span>
+			<span class="hl kwa">else</span> <span class="hl opt">{</span>
+				<span class="hl slc">//Increment counter</span>
+				counter<span class="hl opt">++;</span>
+				<span class="hl slc">//Move time display</span>
+				CurrentTimePercentage<span class="hl opt">++;</span>
+				<span class="hl slc">//Servo_MoveTimer(BEGINNING_TIME+CurrentTimePercentage*DeltaTime);</span>
+        <span class="hl kwd">Servo_MoveTimer</span><span class="hl opt">(</span>counter<span class="hl opt">);</span>
+				<span class="hl slc">//Init timer</span>
+				<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>GLOBAL_TIMER<span class="hl opt">,</span> DeltaTime<span class="hl opt">);</span>
+				<span class="hl opt">}</span>
+			<span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+ 
+  <span class="hl kwa">return</span> ReturnEvent<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***************************************************************************</span>
+<span class="hl com"> private functions</span>
+<span class="hl com"> ***************************************************************************/</span>
+
+ 
+<span class="hl com">/*------------------------------- Footnotes -------------------------------*/</span>
+<span class="hl com">/*------------------------------ End of file ------------------------------*/</span>
+
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

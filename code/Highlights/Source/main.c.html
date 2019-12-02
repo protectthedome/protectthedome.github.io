@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>main.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">     main.c</span>
+<span class="hl com"> Description</span>
+<span class="hl com">     starter main() function for Events and Services Framework applications</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> History</span>
+<span class="hl com"> When           Who     What/Why</span>
+<span class="hl com"> -------------- ---     --------</span>
+<span class="hl com"> 08/21/17 12:53 jec     added this header as part of coding standard and added</span>
+<span class="hl com">                        code to enable as GPIO the port poins that come out of</span>
+<span class="hl com">                        reset locked or in an alternate function.</span>
+<span class="hl com">*****************************************************************************/</span>
+<span class="hl ppc">#include &lt;stdint.h&gt;</span>
+<span class="hl ppc">#include &lt;stdbool.h&gt;</span>
+<span class="hl ppc">#include &lt;stdio.h&gt;</span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Configure.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Framework.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Port.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;termio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;EnablePA25_PB23_PD7_PF0.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Servo.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ShiftRegisterWrite.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;AirLeakLib.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl ppc">#define clrScrn() printf(</span><span class="hl pps">&quot;</span><span class="hl esc">\x1b</span><span class="hl pps">[2J&quot;</span><span class="hl ppc">)</span>
+<span class="hl ppc">#define goHome() printf(</span><span class="hl pps">&quot;</span><span class="hl esc">\x1b</span><span class="hl pps">[1,1H&quot;</span><span class="hl ppc">)</span>
+<span class="hl ppc">#define clrLine() printf(</span><span class="hl pps">&quot;</span><span class="hl esc">\x1b</span><span class="hl pps">[K&quot;</span><span class="hl ppc">)</span>
+
+<span class="hl kwb">int</span> <span class="hl kwd">main</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  ES_Return_t ErrorType<span class="hl opt">;</span>
+
+  <span class="hl slc">// Set the clock to run at 40MhZ using the PLL and 16MHz external crystal</span>
+  <span class="hl kwd">SysCtlClockSet</span><span class="hl opt">(</span>SYSCTL_SYSDIV_5 <span class="hl opt">|</span> SYSCTL_USE_PLL <span class="hl opt">|</span> SYSCTL_OSC_MAIN
+      <span class="hl opt">|</span> SYSCTL_XTAL_16MHZ<span class="hl opt">);</span>
+  <span class="hl kwd">TERMIO_Init</span><span class="hl opt">();</span>
+  <span class="hl kwd">clrScrn</span><span class="hl opt">();</span>
+
+  <span class="hl slc">// When doing testing, it is useful to announce just which program</span>
+  <span class="hl slc">// is running.</span>
+  <span class="hl kwd">puts</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">Starting Protect the DOME! Production v4</span><span class="hl esc">\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+  <span class="hl kwd">printf</span><span class="hl opt">(</span> <span class="hl str">&quot;the 2nd Generation Events &amp; Services Framework V2.4</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+  <span class="hl kwd">printf</span><span class="hl opt">(</span> <span class="hl str">&quot;%s %s</span><span class="hl esc">\n</span><span class="hl str">&quot;</span><span class="hl opt">,</span> __TIME__<span class="hl opt">,</span> __DATE__<span class="hl opt">);</span>
+  <span class="hl kwd">printf</span><span class="hl opt">(</span> <span class="hl str">&quot;</span><span class="hl esc">\n\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+  <span class="hl slc">//printf( &quot;Press any key to post key-stroke events to Service 0\n\r&quot;);</span>
+  <span class="hl kwd">printf</span><span class="hl opt">(</span> <span class="hl str">&quot;Press &#39;d&#39; to test event deferral</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+  <span class="hl kwd">printf</span><span class="hl opt">(</span> <span class="hl str">&quot;Press &#39;r&#39; to test event recall</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+
+  <span class="hl slc">// reprogram the ports that are set as alternate functions or</span>
+  <span class="hl slc">// locked coming out of reset. (PA2-5, PB2-3, PD7, PF0)</span>
+  <span class="hl slc">// After this call these ports are set</span>
+  <span class="hl slc">// as GPIO inputs and can be freely re-programmed to change config.</span>
+  <span class="hl slc">// or assign to alternate any functions available on those pins</span>
+  <span class="hl kwd">PortFunctionInit</span><span class="hl opt">();</span>
+
+  <span class="hl slc">// Your hardware initialization function calls go here</span>
+  <span class="hl kwd">Servo_HWInit</span><span class="hl opt">();</span>
+  <span class="hl kwd">AirLeak_Init</span><span class="hl opt">();</span>
+  <span class="hl kwd">SR_Init</span><span class="hl opt">();</span>
+  <span class="hl kwd">SR_Write</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">);</span>
+  
+  <span class="hl slc">// now initialize the Events and Services Framework and start it running</span>
+  ErrorType <span class="hl opt">=</span> <span class="hl kwd">ES_Initialize</span><span class="hl opt">(</span>ES_Timer_RATE_1mS<span class="hl opt">);</span>
+  <span class="hl kwa">if</span> <span class="hl opt">(</span>ErrorType <span class="hl opt">==</span> Success<span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    
+    ErrorType <span class="hl opt">=</span> <span class="hl kwd">ES_Run</span><span class="hl opt">();</span>
+  <span class="hl opt">}</span>
+  <span class="hl slc">//if we got to here, there was an error</span>
+  <span class="hl kwa">switch</span> <span class="hl opt">(</span>ErrorType<span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwa">case</span> FailedPost<span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Failed on attempt to Post</span><span class="hl esc">\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+    <span class="hl kwa">case</span> FailedPointer<span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Failed on NULL pointer</span><span class="hl esc">\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+    <span class="hl kwa">case</span> FailedInit<span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Failed Initialization</span><span class="hl esc">\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+    <span class="hl kwa">default</span><span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Other Failure</span><span class="hl esc">\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+  <span class="hl kwa">for</span> <span class="hl opt">( ; ;)</span>
+  <span class="hl opt">{</span>
+    <span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+<span class="hl opt">}</span>
+
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

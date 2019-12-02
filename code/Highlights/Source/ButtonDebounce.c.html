@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ButtonDebounce.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   ButtonDebounce.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This is the first service for the button debounce under the</span>
+<span class="hl com">   Gen2 Events and Services Framework.</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl com">/*----------------------------- Include Files -----------------------------*/</span>
+<span class="hl com">/* include header files for this service</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ButtonDebounce.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include &lt;string.h&gt;</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon_SM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ResetService.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Meteor_SM.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl com">/* include header files for hardware access</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl com">/* include header files for the framework</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Configure.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Framework.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_DeferRecall.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_ShortTimer.h&quot;</span><span class="hl ppc"></span>
+
+
+
+
+<span class="hl com">/*----------------------------- Module Defines ----------------------------*/</span>
+<span class="hl slc">// these times assume a 1.000mS/tick timing</span>
+<span class="hl ppc">#define ONE_SEC 1000</span>
+<span class="hl ppc">#define HALF_SEC (ONE_SEC/2)</span>
+<span class="hl ppc">#define TWO_SEC (ONE_SEC*2)</span>
+<span class="hl ppc">#define FIVE_SEC (ONE_SEC*5)</span>
+
+<span class="hl com">/*---------------------------- Module Functions ---------------------------*/</span>
+<span class="hl com">/* prototypes for private functions for this service.They should be functions</span>
+<span class="hl com">   relevant to the behavior of this service</span>
+<span class="hl com">*/</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">CheckButtonEvents</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+
+
+<span class="hl com">/*---------------------------- Module Variables ---------------------------*/</span>
+<span class="hl slc">// with the introduction of Gen2, we need a module level Priority variable</span>
+<span class="hl kwb">static uint8_t</span> MyPriority<span class="hl opt">;</span>
+<span class="hl slc">//Initialize to low (up)</span>
+<span class="hl kwb">static uint8_t</span> LastButtonState <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+<span class="hl kwb">static</span> ButtonState_t CurrentSMState<span class="hl opt">;</span>
+
+
+
+<span class="hl slc">// add a deferral queue for up to 3 pending deferrals +1 to allow for overhead</span>
+<span class="hl kwb">static</span> ES_Event_t DeferralQueue<span class="hl opt">[</span><span class="hl num">3</span><span class="hl opt">+</span><span class="hl num">1</span><span class="hl opt">];</span>
+
+<span class="hl com">/*------------------------------ Module Code ------------------------------*/</span>
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     InitButtonDebounce</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     uint8_t : the priorty of this service</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool, false if error in initialization, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Saves away the priority, and does any </span>
+<span class="hl com">     other required initialization for this service</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     J. Edward Carryer, 01/16/12, 10:00</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">InitButtonDebounce</span> <span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  MyPriority <span class="hl opt">=</span> Priority<span class="hl opt">;</span>
+
+  
+  <span class="hl slc">//Set SM currentstate</span>
+  CurrentSMState <span class="hl opt">=</span> Ready2Sample<span class="hl opt">;</span>
+  
+  <span class="hl kwa">return true</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+
+
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     PostButtonDebounce</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     EF_Event ThisEvent ,the event to post to the queue</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool false if the Enqueue operation failed, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Posts an event to this state machine&#39;s queue</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     J. Edward Carryer, 10/23/11, 19:25</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">PostButtonDebounce</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwa">return</span> <span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span> MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">    RunButtonDebounce</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">   ES_Event_t : the event to process</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">   ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   add your description here</span>
+<span class="hl com"> Notes</span>
+<span class="hl com">   </span>
+<span class="hl com"> Author</span>
+<span class="hl com">   J. Edward Carryer, 01/15/12, 15:23</span>
+<span class="hl com">****************************************************************************/</span>
+ES_Event_t <span class="hl kwd">RunButtonDebounce</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  ES_Event_t NewEvent<span class="hl opt">;</span>
+  ES_Event_t ReturnEvent<span class="hl opt">;</span>
+  ReturnEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_NO_EVENT<span class="hl opt">;</span>
+  
+  <span class="hl kwa">switch</span> <span class="hl opt">(</span>CurrentSMState<span class="hl opt">) {</span>
+    <span class="hl kwa">case</span> Ready2Sample<span class="hl opt">:</span>
+      <span class="hl slc">//If this event is a button up event</span>
+    <span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Button_Up<span class="hl opt">) {</span>
+      <span class="hl slc">//Update SM state</span>
+      CurrentSMState <span class="hl opt">=</span> Debounce<span class="hl opt">;</span>
+      <span class="hl slc">//Start timer</span>
+      <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>DEBOUNCE_TIMER<span class="hl opt">,</span> <span class="hl num">50</span><span class="hl opt">);</span>
+    <span class="hl opt">}</span> <span class="hl kwa">else</span>
+	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Button_Down<span class="hl opt">){</span>
+      <span class="hl slc">//Post Cannon_Button_Down</span>
+      NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Cannon_Button_Down<span class="hl opt">;</span>
+      <span class="hl kwd">PostCannon_SM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+      <span class="hl kwd">PostMeteor_SM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+	    <span class="hl kwd">PostResetService</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+	  <span class="hl slc">//Update SM state</span>
+      CurrentSMState <span class="hl opt">=</span> Debounce<span class="hl opt">;</span>
+      <span class="hl slc">//Start timer</span>
+      <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>DEBOUNCE_TIMER<span class="hl opt">,</span> <span class="hl num">50</span><span class="hl opt">);</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+    <span class="hl kwa">case</span> Debounce<span class="hl opt">:</span>
+      <span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">) {</span>
+        <span class="hl slc">//Move back into ready2sample</span>
+        CurrentSMState <span class="hl opt">=</span> Ready2Sample<span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+ 
+  <span class="hl kwa">return</span> ReturnEvent<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***************************************************************************</span>
+<span class="hl com"> private functions</span>
+<span class="hl com"> ***************************************************************************/</span>
+
+
+<span class="hl kwb">bool</span> <span class="hl kwd">CheckButtonEvents</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">) {</span>
+  ES_Event_t NewEvent<span class="hl opt">;</span>
+  <span class="hl kwb">bool</span> ReturnVal <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
+  
+  <span class="hl slc">//Set current button state</span>
+  <span class="hl kwb">uint8_t</span> CurrentButtonState <span class="hl opt">=</span> <span class="hl kwd">Cannon_ReadButton</span><span class="hl opt">();</span>
+  
+  <span class="hl slc">//If different from last state</span>
+  <span class="hl kwa">if</span> <span class="hl opt">(</span>CurrentButtonState <span class="hl opt">!=</span> LastButtonState<span class="hl opt">) {</span>
+    <span class="hl slc">//Set return val</span>
+    ReturnVal <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span>
+    <span class="hl slc">//If state is down</span>
+    <span class="hl kwa">if</span> <span class="hl opt">(</span>CurrentButtonState <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl opt">) {</span>
+      <span class="hl slc">//Post event</span>
+      NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Button_Down<span class="hl opt">;</span>
+      <span class="hl kwd">PostButtonDebounce</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+    <span class="hl opt">}</span> <span class="hl kwa">else</span> <span class="hl opt">{</span> 
+      <span class="hl slc">//Post event</span>
+      NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Button_Up<span class="hl opt">;</span>
+      <span class="hl kwd">PostButtonDebounce</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+    <span class="hl opt">}</span>
+  <span class="hl opt">}</span>
+  <span class="hl slc">//Set last state to current state and return</span>
+  LastButtonState <span class="hl opt">=</span> CurrentButtonState<span class="hl opt">;</span>
+  <span class="hl kwa">return</span> ReturnVal<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+ 
+<span class="hl com">/*------------------------------- Footnotes -------------------------------*/</span>
+<span class="hl com">/*------------------------------ End of file ------------------------------*/</span>
+
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

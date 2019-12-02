@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AirLeak_SM.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">  AirLeak_SM.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   State machine for Air Leak interaction</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> History</span>
+<span class="hl com"> When           Who     What/Why</span>
+<span class="hl com"> -------------- ---     --------</span>
+<span class="hl com"> 11/08/19 19:00 gab      pseudo-code</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl com">/*----------------------------- Include Files -----------------------------*/</span>
+<span class="hl com">/* include header files for this service</span>
+<span class="hl com">*/</span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;AirLeak_SM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;AirLeakLib.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ResetService.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ArcadeFSM.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl ppc">#include &lt;stdio.h&gt;</span>
+<span class="hl ppc">#include &lt;stdlib.h&gt;</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Meteor_SM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include &lt;string.h&gt;</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Meteor.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon_SM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ArcadeFSM.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl com">/* include header files for hardware access</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl com">/* include header files for the framework</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Configure.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Framework.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_DeferRecall.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_ShortTimer.h&quot;</span><span class="hl ppc"></span>
+
+
+
+<span class="hl com">/*----------------------------- Module Defines ----------------------------*/</span>
+<span class="hl ppc">#define ONE_SEC 1000</span> <span class="hl slc">// this time assume a 1.000mS/tick timing</span>
+<span class="hl ppc"></span><span class="hl ppc">#define MAX_TIME (ONE_SEC*10)</span> <span class="hl slc">//Define maximum time to plugg the leak (10 seconds)</span>
+<span class="hl ppc"></span><span class="hl ppc">#define STEP_TIME (ONE_SEC/2)</span> <span class="hl slc">//Define Time between steps</span>
+<span class="hl ppc"></span><span class="hl ppc">#define N_STEPS (MAX_TIME/STEP_TIME)</span> <span class="hl slc">//Define total number of steps</span>
+<span class="hl ppc"></span><span class="hl ppc">#define MAX_OXIGEN_LEVEL 100</span> <span class="hl slc">//Define maximum oxigen level</span>
+<span class="hl ppc"></span><span class="hl ppc">#define STEP_OXIGEN MAX_OXIGEN_LEVEL/N_STEPS</span> <span class="hl slc">//Define step size of oxigen gauge</span>
+<span class="hl ppc"></span>
+
+
+<span class="hl com">/*---------------------------- Module Functions ---------------------------*/</span>
+<span class="hl com">/* prototypes for private functions for this service.They should be functions</span>
+<span class="hl com">   relevant to the behavior of this service</span>
+<span class="hl com">*/</span>
+
+<span class="hl kwb">static void</span> <span class="hl kwd">SaveHallData</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">) ;</span>
+<span class="hl kwb">static uint8_t</span> <span class="hl kwd">RandomExclusive</span><span class="hl opt">(</span><span class="hl kwb">uint16_t</span> SysTime<span class="hl opt">);</span>
+
+
+<span class="hl com">/*---------------------------- Module Variables ---------------------------*/</span>
+<span class="hl slc">// with the introduction of Gen2, we need a module level Priority variable</span>
+<span class="hl kwb">static uint8_t</span> MyPriority<span class="hl opt">;</span>
+<span class="hl kwb">static</span> AirLeakState_t CurrentState<span class="hl opt">;</span>
+
+<span class="hl kwb">static uint8_t</span> Fan<span class="hl opt">=</span><span class="hl num">3</span><span class="hl opt">;</span> <span class="hl slc">//Active Fan (0,1,2, initiate to an invalid number)</span>
+<span class="hl kwb">static uint8_t</span> HallData<span class="hl opt">[</span><span class="hl num">3</span><span class="hl opt">];</span><span class="hl slc">//Hall sensors data</span>
+<span class="hl kwb">static uint8_t</span> previous_HallData<span class="hl opt">[</span><span class="hl num">3</span><span class="hl opt">];</span><span class="hl slc">//Hall sensors data</span>
+<span class="hl kwb">static uint8_t</span> MachineCounter<span class="hl opt">;</span>
+<span class="hl kwb">static uint8_t</span> Indices<span class="hl opt">[] = {</span><span class="hl num">0</span><span class="hl opt">,</span> <span class="hl num">1</span><span class="hl opt">,</span> <span class="hl num">2</span><span class="hl opt">};</span>
+
+
+<span class="hl com">/*------------------------------ Module Code ------------------------------*/</span>
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     InitializeAirLeak</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     uint8_t : the priorty of this service</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool, false if error in initialization, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Saves away the priority, and does any</span>
+<span class="hl com">     other required initialization for this service</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">    Gabriela Bravo, 11/08/19, 19:04</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">InitAirLeak_SM</span><span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl slc">//save initial state of hall sensors</span>
+  <span class="hl kwd">AirLeak_ReadHallSensors</span><span class="hl opt">(</span>previous_HallData<span class="hl opt">);</span>
+
+  <span class="hl slc">//Initialize the MyPriority variable with the passed in parameter.</span>
+  MyPriority <span class="hl opt">=</span> Priority<span class="hl opt">;</span>
+
+  <span class="hl slc">//Set CurrentState to be Idle_A</span>
+  CurrentState<span class="hl opt">=</span>Idle_A<span class="hl opt">;</span>
+
+  <span class="hl kwa">return true</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     PostAirLeakSM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     ES_Event_t ThisEvent ,the event to post to the queue</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool false if the Enqueue operation failed, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Posts an event to this state machine&#39;s queue</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     Gabriela Bravo, 11/08/19, 19:27</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">PostAirLeak_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwa">return</span> <span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span> MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">    RunAirLeakSM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">   ES_Event_t : the event to process. This event will be one of:</span>
+<span class="hl com"></span>
+<span class="hl com"></span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">   ES_NO_EVENT</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com"></span>
+<span class="hl com"></span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">   Gabriela Bravo, 11/08/19, 19:20</span>
+<span class="hl com">****************************************************************************/</span>
+ES_Event_t <span class="hl kwd">RunAirLeak_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  ES_Event_t ReturnEvent<span class="hl opt">;</span>
+  ES_Event_t NewEvent<span class="hl opt">;</span>
+  ReturnEvent<span class="hl opt">.</span>EventType<span class="hl opt">=</span>ES_NO_EVENT<span class="hl opt">;</span>
+
+    <span class="hl kwa">switch</span> <span class="hl opt">(</span>CurrentState<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwa">case</span> Idle_A <span class="hl opt">:</span><span class="hl slc">//		CurrentState is Idle_A</span>
+  <span class="hl opt">{</span><span class="hl slc">//if tot inserted</span>
+    <span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Tot_Inserted<span class="hl opt">){</span>
+      <span class="hl slc">//set oxygen gauge to max</span>
+      <span class="hl kwd">AirLeak_MoveGauge</span><span class="hl opt">(</span>MAX_OXIGEN_LEVEL<span class="hl opt">);</span>
+      <span class="hl slc">//Indices[] equal {0, 1, 2}</span>
+      <span class="hl kwb">uint8_t</span> index<span class="hl opt">;</span>
+      <span class="hl kwa">for</span><span class="hl opt">(</span>index<span class="hl opt">=</span><span class="hl num">0</span><span class="hl opt">;</span> index <span class="hl opt">&lt;</span><span class="hl num">3</span><span class="hl opt">;</span> index<span class="hl opt">++)</span>
+      <span class="hl opt">{</span>
+        Indices<span class="hl opt">[</span>index<span class="hl opt">] =</span> index<span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+    <span class="hl opt">}</span><span class="hl slc">//end if</span>
+
+    <span class="hl slc">//if Leak_Develops</span>
+     <span class="hl kwa">if</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Leak_Develops<span class="hl opt">)</span>
+      <span class="hl opt">{</span>
+
+        <span class="hl kwb">uint16_t</span> SysTime<span class="hl opt">;</span>
+        <span class="hl slc">//Use system time to randomly select the fan</span>
+        SysTime <span class="hl opt">=</span> <span class="hl kwd">ES_Timer_GetTime</span><span class="hl opt">();</span>
+        Fan <span class="hl opt">=</span> <span class="hl kwd">RandomExclusive</span><span class="hl opt">(</span>SysTime<span class="hl opt">);</span>
+        <span class="hl slc">//printf(&quot;\rFan: %u\r\n&quot;, Fan);</span>
+        <span class="hl slc">// Turn the fan on</span>
+        <span class="hl kwd">AirLeak_FanControl</span><span class="hl opt">(</span>Fan<span class="hl opt">,</span> On<span class="hl opt">);</span>
+        <span class="hl slc">//Start timer</span>
+        <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>AIRLEAK_TIMER<span class="hl opt">,</span> STEP_TIME<span class="hl opt">);</span>
+		CurrentState <span class="hl opt">=</span> FanOn<span class="hl opt">;</span>
+		<span class="hl slc">//Increment MachineCounter</span>
+		MachineCounter<span class="hl opt">++;</span>
+      <span class="hl opt">}</span>
+      <span class="hl kwa">else if</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> End_Of_Game <span class="hl opt">||</span> ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> RST<span class="hl opt">)</span>
+      <span class="hl opt">{</span>
+        MachineCounter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+        <span class="hl slc">//printf(&quot;\rMachineCounter: %u\r\n&quot;, MachineCounter);</span>
+      <span class="hl opt">}</span>
+     <span class="hl opt">}</span>
+
+  <span class="hl kwa">break</span><span class="hl opt">;</span>
+    <span class="hl slc">//End Idle_A state</span>
+  <span class="hl kwa">case</span> FanOn <span class="hl opt">:</span><span class="hl slc">//CurrentState is On</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwb">uint8_t</span> Oxigen_Level <span class="hl opt">=</span> <span class="hl kwd">AirLeak_QueryGauge</span><span class="hl opt">();</span>
+    <span class="hl slc">//If TIME_OUT and Oxygen_Level greater than 0</span>
+    <span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span>ES_TIMEOUT <span class="hl opt">&amp;&amp;</span> Oxigen_Level<span class="hl opt">&gt;</span><span class="hl num">0</span><span class="hl opt">){</span>
+      <span class="hl slc">//Decrement oxygen gauge</span>
+      <span class="hl kwd">AirLeak_MoveGauge</span><span class="hl opt">(</span>Oxigen_Level <span class="hl opt">-</span> STEP_OXIGEN<span class="hl opt">);</span>
+      <span class="hl slc">//init timer</span>
+      <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>AIRLEAK_TIMER<span class="hl opt">,</span> STEP_TIME<span class="hl opt">);</span>
+    <span class="hl opt">}</span><span class="hl slc">//end if</span>
+
+    <span class="hl slc">//If TIME_OUT Oxygen_Level less or equal to 0</span>
+    <span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span>ES_TIMEOUT <span class="hl opt">&amp;&amp;</span> Oxigen_Level<span class="hl opt">&lt;=</span><span class="hl num">0</span><span class="hl opt">){</span>
+      <span class="hl slc">//Post to all End_Of_Game with parameter Game_Over</span>
+      NewEvent<span class="hl opt">.</span>EventType<span class="hl opt">=</span>End_Of_Game<span class="hl opt">;</span>
+      NewEvent<span class="hl opt">.</span>EventParam <span class="hl opt">=</span> GAME_OVER<span class="hl opt">;</span>
+      <span class="hl kwd">ES_PostAll</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+      <span class="hl slc">//Turn off fan</span>
+      <span class="hl kwd">AirLeak_FanControl</span><span class="hl opt">(</span>Fan<span class="hl opt">,</span>Off<span class="hl opt">);</span>
+      <span class="hl slc">//move to Idle_A state</span>
+      CurrentState <span class="hl opt">=</span> Idle_A<span class="hl opt">;</span>
+      <span class="hl slc">//set Fan to invalid</span>
+      Fan<span class="hl opt">=</span><span class="hl num">3</span><span class="hl opt">;</span>
+    <span class="hl opt">}</span><span class="hl slc">//end if</span>
+
+
+    <span class="hl slc">//If AirflowPlugged</span>
+    <span class="hl kwa">if</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span>Airflow_Plugged<span class="hl opt">){</span>
+      <span class="hl slc">//Turn off Fan</span>
+      <span class="hl kwd">AirLeak_FanControl</span><span class="hl opt">(</span>Fan<span class="hl opt">,</span>Off<span class="hl opt">);</span>
+      <span class="hl slc">//Post Interaction_Completed to Arcade_SM</span>
+      NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Interaction_Completed<span class="hl opt">;</span>
+      <span class="hl kwd">PostArcadeFSM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+
+      <span class="hl slc">//Set oxygen gauge to maximum</span>
+      <span class="hl kwd">AirLeak_MoveGauge</span><span class="hl opt">(</span>MAX_OXIGEN_LEVEL<span class="hl opt">);</span>
+      <span class="hl slc">//move to Idle_A state</span>
+      CurrentState <span class="hl opt">=</span> Idle_A<span class="hl opt">;</span>
+      <span class="hl slc">//set Fan to invalid</span>
+      <span class="hl slc">//Fan=3;</span>
+    <span class="hl opt">}</span><span class="hl slc">//end if</span>
+
+    <span class="hl slc">//if RST</span>
+    <span class="hl kwa">else if</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> RST<span class="hl opt">){</span>
+      <span class="hl slc">//Turn off fan</span>
+      <span class="hl kwd">AirLeak_FanControl</span><span class="hl opt">(</span>Fan<span class="hl opt">,</span>Off<span class="hl opt">);</span>
+      <span class="hl slc">//move to Idle_A state</span>
+      CurrentState <span class="hl opt">=</span> Idle_A<span class="hl opt">;</span>
+      <span class="hl slc">//FanIndex = 0;</span>
+      MachineCounter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+      <span class="hl slc">//set Fan to invalid</span>
+      Fan<span class="hl opt">=</span><span class="hl num">3</span><span class="hl opt">;</span>
+    <span class="hl opt">}</span><span class="hl slc">//end if</span>
+
+    <span class="hl slc">//If End_Of_Game</span>
+    <span class="hl kwa">else if</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> End_Of_Game<span class="hl opt">){</span>
+      <span class="hl slc">//Turn off fan</span>
+      <span class="hl kwd">AirLeak_FanControl</span><span class="hl opt">(</span>Fan<span class="hl opt">,</span>Off<span class="hl opt">);</span>
+      <span class="hl slc">//move to Idle_A state</span>
+      CurrentState <span class="hl opt">=</span> Idle_A<span class="hl opt">;</span>
+      <span class="hl slc">//FanIndex = 0;</span>
+      MachineCounter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+      <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">MachineCounter: %u</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">,</span> MachineCounter<span class="hl opt">);</span>
+      <span class="hl slc">//set Fan to invalid</span>
+      Fan<span class="hl opt">=</span><span class="hl num">3</span><span class="hl opt">;</span>
+    <span class="hl opt">}</span><span class="hl slc">//end if</span>
+<span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+
+
+
+<span class="hl opt">}</span>
+<span class="hl slc">//Return ES_NO_EVENT</span>
+<span class="hl kwa">return</span> ReturnEvent<span class="hl opt">;</span>
+
+<span class="hl opt">}</span>
+
+<span class="hl com">/***************************************************************************</span>
+<span class="hl com"> private functions</span>
+<span class="hl com"> ***************************************************************************/</span>
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">    AirPlugChecker</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">   None</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">   bool. True is a new event has been published</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">Gabriela Bravo, 11//19, 16:00</span>
+<span class="hl com">****************************************************************************/</span>
+ <span class="hl kwb">bool</span> <span class="hl kwd">AirPlugChecker</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">) {</span>
+   ES_Event_t ReturnEvent<span class="hl opt">;</span>
+   <span class="hl kwb">bool</span> ReturnVal <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
+
+   <span class="hl slc">//read hall sensors data</span>
+   <span class="hl kwd">AirLeak_ReadHallSensors</span><span class="hl opt">(</span>HallData<span class="hl opt">);</span>
+
+	 <span class="hl slc">//if active leak plugged, post to Airleak_SM</span>
+   <span class="hl kwa">if</span><span class="hl opt">(</span>Fan<span class="hl opt">&lt;</span><span class="hl num">3</span><span class="hl opt">){</span>
+     <span class="hl slc">//printf(&quot;checking %u\n\r&quot;,HallData[Fan]);</span>
+     <span class="hl kwa">if</span><span class="hl opt">(</span>HallData<span class="hl opt">[</span>Fan<span class="hl opt">]==</span><span class="hl num">0</span> <span class="hl opt">){</span>
+       <span class="hl slc">//post that air leak was plugged</span>
+       ReturnEvent<span class="hl opt">.</span>EventType<span class="hl opt">=</span>Airflow_Plugged<span class="hl opt">;</span>
+       <span class="hl kwd">PostAirLeak_SM</span><span class="hl opt">(</span>ReturnEvent<span class="hl opt">);</span>
+       <span class="hl slc">//save hall data as previous state</span>
+       <span class="hl kwd">SaveHallData</span><span class="hl opt">();</span>
+       <span class="hl slc">//return true</span>
+       ReturnVal <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span>
+     <span class="hl opt">}</span>
+ <span class="hl opt">}</span>
+   <span class="hl slc">//if any of the sensors changed state, count it as a new interaction</span>
+   <span class="hl kwa">if</span> <span class="hl opt">((</span>HallData<span class="hl opt">[</span><span class="hl num">0</span><span class="hl opt">]!=</span>previous_HallData<span class="hl opt">[</span><span class="hl num">0</span><span class="hl opt">]) || (</span>HallData<span class="hl opt">[</span><span class="hl num">1</span><span class="hl opt">]!=</span>previous_HallData<span class="hl opt">[</span><span class="hl num">1</span><span class="hl opt">]) ||</span>
+     <span class="hl opt">(</span>HallData<span class="hl opt">[</span><span class="hl num">2</span><span class="hl opt">]!=</span>previous_HallData<span class="hl opt">[</span><span class="hl num">2</span><span class="hl opt">]) ) {</span>
+      <span class="hl slc">//post to reset service</span>
+     ReturnEvent<span class="hl opt">.</span>EventType<span class="hl opt">=</span>Airflow_Plugged<span class="hl opt">;</span>
+     <span class="hl kwd">PostResetService</span><span class="hl opt">(</span>ReturnEvent<span class="hl opt">);</span>
+     <span class="hl slc">//return true</span>
+     <span class="hl kwd">SaveHallData</span><span class="hl opt">();</span>
+     ReturnVal <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span>
+   <span class="hl opt">}</span>
+
+   <span class="hl slc">//return</span>
+     <span class="hl kwa">return</span> ReturnVal<span class="hl opt">;</span>
+ <span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">    SaveHallData</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">   None</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">   Fucntion that copy array with halldata info to Previous_HallData</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com"> Gabriela Bravo, 11//19, 19:00</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">static void</span> <span class="hl kwd">SaveHallData</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">) {</span>
+  <span class="hl slc">//copy to array</span>
+	<span class="hl kwb">int</span> index <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+	<span class="hl kwa">for</span><span class="hl opt">(</span>index<span class="hl opt">=</span><span class="hl num">0</span><span class="hl opt">;</span>index<span class="hl opt">&lt;</span><span class="hl num">3</span><span class="hl opt">;</span>index<span class="hl opt">++)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">//copy by element</span>
+		previous_HallData<span class="hl opt">[</span>index<span class="hl opt">] =</span> HallData<span class="hl opt">[</span>index<span class="hl opt">];</span>
+ <span class="hl opt">}</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">RandomExclusive Function Description</span>
+<span class="hl com">	Arguments: System Clock Time</span>
+<span class="hl com">	Returns: Fan Number</span>
+<span class="hl com">	This function picks a random fan from the list, return that value, and</span>
+<span class="hl com">	then &quot;removes&quot; that fan from the list so it cannot be picked again.</span>
+<span class="hl com"></span>
+<span class="hl com">	Author: R. Merchant</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">static uint8_t</span> <span class="hl kwd">RandomExclusive</span><span class="hl opt">(</span><span class="hl kwb">uint16_t</span> SysTime<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+    <span class="hl kwb">uint8_t</span> ReturnVal<span class="hl opt">;</span>
+    <span class="hl slc">//create static array to store indices</span>
+    <span class="hl kwb">int8_t</span> counter <span class="hl opt">=</span> <span class="hl num">3</span> <span class="hl opt">-</span> MachineCounter<span class="hl opt">;</span>
+    <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">Counter: %u</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">,</span> counter<span class="hl opt">);</span>
+    <span class="hl slc">//Create int to track position in the array</span>
+    <span class="hl kwb">uint8_t</span> index<span class="hl opt">;</span>
+    <span class="hl slc">//If count is valid</span>
+    <span class="hl kwa">if</span><span class="hl opt">(</span>counter <span class="hl opt">&gt;</span> <span class="hl num">0</span><span class="hl opt">)</span>
+    <span class="hl opt">{</span>
+        <span class="hl slc">// Get mod of the division by the counter</span>
+        index <span class="hl opt">=</span> SysTime<span class="hl opt">%</span>counter<span class="hl opt">;</span>
+        <span class="hl slc">// Get array element at mod result</span>
+       ReturnVal <span class="hl opt">=</span> Indices<span class="hl opt">[</span>index<span class="hl opt">];</span>
+        <span class="hl slc">//Start loop to remove the element and push</span>
+        <span class="hl slc">//everything above it down.</span>
+        <span class="hl kwb">uint8_t</span> lpcnt<span class="hl opt">;</span>
+        <span class="hl kwa">for</span> <span class="hl opt">(</span>lpcnt <span class="hl opt">=</span> index <span class="hl opt">;</span> lpcnt <span class="hl opt">&lt;</span> <span class="hl num">3</span><span class="hl opt">;</span> lpcnt<span class="hl opt">++)</span>
+        <span class="hl opt">{</span>
+            <span class="hl slc">//Over write n element with n+1</span>
+            Indices<span class="hl opt">[</span>lpcnt<span class="hl opt">] =</span> Indices<span class="hl opt">[</span>lpcnt<span class="hl opt">+</span><span class="hl num">1</span><span class="hl opt">];</span>
+        <span class="hl opt">}</span>
+    <span class="hl opt">}</span> <span class="hl slc">// End if</span>
+    <span class="hl kwa">return</span><span class="hl opt">(</span>ReturnVal<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+<span class="hl com">/*------------------------------- Footnotes -------------------------------*/</span>
+<span class="hl com">/*------------------------------ End of file ------------------------------*/</span>
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

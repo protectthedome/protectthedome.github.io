@@ -1,0 +1,39 @@
+SR_Init
+	Arguments: None
+	Return nothing
+
+{
+	set up port A by enabling the peripheral clock, waiting for the 
+	peripheral to be ready and setting the direction
+	of PA2, PA3 & PA3 to output
+	Turn on PORTA
+	Wait for the port clock to come online
+	Set PA2, PA3, and PA4 as digital outputs
+	Leave the configuration for the above ports as totem-poles
+	start with the data & sclk lines low and the RCLK line high
+}
+
+SR_GetCurrentRegister
+	Arugments: None
+	Returns last value what was sent (32-bit uint)
+{
+  return LocalRegisterImage
+}
+
+void SR_Write
+	Arguments: Value to write
+	Returns nothing
+	Shifts through the 24bits of the value to write, placing each bit into
+	the register. Once complete, it sets the output of the register.
+{
+	lower the register clock
+	copy into module var holder for read back
+	Loop through all the bits in dataSR
+		Isolate the MSB of NewValue, put it into the LSB position and output to port
+		shift out the data while pulsing the serial clock 
+		Isolate the MSB of NewValue, put it into the LSB position and output to port
+		Pulse PBO
+		Shift dataSR left 1 bit
+	finish looping through bits in NewValue
+	raise the register clock to latch the new data
+}

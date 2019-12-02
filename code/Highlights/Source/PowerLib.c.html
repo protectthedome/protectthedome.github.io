@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>PowerLib.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   PowerLib.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This module reads the comparator output and controls the power gauge</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> History</span>
+<span class="hl com"> When           Who     What/Why</span>
+<span class="hl com"> -------------- ---     --------</span>
+<span class="hl com"> 11/10/19 16:04 ram     initial release</span>
+<span class="hl com"> </span>
+<span class="hl com">****************************************************************************/</span>
+
+<span class="hl slc">// the common headers for C99 types </span>
+<span class="hl ppc">#include &lt;stdint.h&gt;</span>
+<span class="hl ppc">#include &lt;stdbool.h&gt;</span>
+
+<span class="hl slc">// the headers to access the GPIO subsystem</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">// the headers to access the TivaWare Library</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/sysctl.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/pin_map.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/timer.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/interrupt.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;termio.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;BITDEFS.H&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">//Libraries</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;PowerLib.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Servo.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ServoDefs.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">//Definitions</span>
+<span class="hl ppc">#define ALL_BITS (0xff&lt;&lt;2) </span>
+<span class="hl ppc">#define POWER_IO_PORT HWREG(GPIO_PORTD_BASE+(GPIO_O_DATA+ALL_BITS))</span>
+<span class="hl ppc">#define POWER_PIN BIT6HI;</span>
+<span class="hl ppc">#define READ_PIN(x) ((x &amp;BIT6HI)&gt;&gt;6)</span>
+
+<span class="hl com">/***Public Functions***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">PowerLib_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">PowerLib_PinState</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">PowerLib_MoveGauge</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> position<span class="hl opt">);</span>
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">PowerLib_QueryGauge</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+
+<span class="hl com">/***Module Level Variables***/</span>
+<span class="hl kwb">static uint8_t</span> GaugePosition<span class="hl opt">;</span>
+
+<span class="hl kwb">void</span> <span class="hl kwd">PowerLib_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl slc">//Turn on PORTD</span>
+  <span class="hl kwd">HWREG</span><span class="hl opt">(</span>SYSCTL_RCGCGPIO<span class="hl opt">) |=</span> SYSCTL_RCGCGPIO_R3<span class="hl opt">;</span>
+	<span class="hl kwa">while</span><span class="hl opt">((</span><span class="hl kwd">HWREG</span><span class="hl opt">(</span>SYSCTL_PRGPIO<span class="hl opt">)&amp;</span>SYSCTL_PRGPIO_R3<span class="hl opt">) !=</span> SYSCTL_PRGPIO_R3<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Intialise PD6 as digital input</span>
+  <span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTD_BASE<span class="hl opt">+</span>GPIO_O_DEN<span class="hl opt">) |=</span> BIT6HI<span class="hl opt">;</span>
+  <span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTD_BASE<span class="hl opt">+</span>GPIO_O_DIR<span class="hl opt">) &amp;=</span> BIT6LO<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">PowerLib_PinState</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl slc">//Get the value of PORTD and mask</span>
+  <span class="hl kwb">uint8_t</span> PinValue<span class="hl opt">;</span>
+  PinValue <span class="hl opt">=</span> POWER_IO_PORT<span class="hl opt">;</span>
+  <span class="hl slc">//shift the value over</span>
+  PinValue <span class="hl opt">=</span> <span class="hl kwd">READ_PIN</span><span class="hl opt">(</span>PinValue<span class="hl opt">);</span>
+  <span class="hl slc">//return the value</span>
+  <span class="hl kwa">return</span><span class="hl opt">(</span>PinValue<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">PowerLib_MoveGauge</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> position<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl slc">//Cal the servo lib function</span>
+  <span class="hl kwb">bool</span> status<span class="hl opt">;</span>
+  status <span class="hl opt">=</span> <span class="hl kwd">Servo_MovePowerGauge</span><span class="hl opt">(</span>position<span class="hl opt">);</span>
+  <span class="hl kwa">if</span><span class="hl opt">(</span>status<span class="hl opt">)</span> <span class="hl slc">// Update gauge position if movement sucessful</span>
+  <span class="hl opt">{</span>
+	  GaugePosition <span class="hl opt">=</span> position<span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+  <span class="hl slc">//return status</span>
+  <span class="hl kwa">return</span><span class="hl opt">(</span>status<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">PowerLib_QueryGauge</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>GaugePosition<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

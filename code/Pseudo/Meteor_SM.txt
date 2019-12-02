@@ -1,0 +1,50 @@
+//Pseudocode for Meteor_SM.c
+
+InitMeteorSM -
+
+Initialize meteor hardware
+Set CurrentSMState to Idle_M
+
+
+RunMeteorSM -
+
+If CurrentSMState is Idle_M
+	If Event is Meteor	
+		Init timer
+		Pick random meteor bank
+		Light first LED
+		Set CurrentSMState to MeteorFalling
+	else if Event is RST or End_Of_Game
+		Reset counter
+
+else if CurrentSMState is MeteorFalling
+	If Event is RST or End_Of_Game
+		Reset counter
+		Clear all meteor LEDs
+		Set CurrentSMState to Idle_M
+	else if Event is Cannon_Button_Down
+		If meteor is in range
+			Post Meteor_Destroyed event
+	else if Event is ES_Timeout
+		if (counter < MAX_COUNT)
+			Turn on next LED
+			Init timer
+		else
+			Post End_Of_Game event
+			Clear all LEDs
+			Set CurrentSMState to Idle_M
+	else if Event is Meteor_Destroyed
+		Turn on LED
+		Init timer
+		Set CurrentSMState to MeteorFlashing
+
+else if CurrentSMState is MeteorFlashing
+	if Event is ES_Timeout
+		If (counter < MAX_COUNT)
+			Toggle LED
+			Increment counter
+			Init timer
+		else
+			Clear all LEDs
+			Post Interaction_Completed event
+			Set CurrentSMState to Idle_M

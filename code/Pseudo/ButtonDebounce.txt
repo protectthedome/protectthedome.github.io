@@ -1,0 +1,26 @@
+//Pseudocode for ButtonDebounce.c
+
+RunButtonDebounce -
+
+If CurrentSMState is Ready2Sample
+	If Event is Button_Up
+		Set CurrentSMState to Debounce
+		Init timer
+	else if Event is Button_Down
+		Post cannon button down event
+		Set CurrentSMState to Debounce
+		Init timer
+
+else if CurrentSMState is Debounce
+	If Event is ES_Timeout
+		Set CurrentSMState to Ready2Sample
+	
+
+CheckButtonEvents - 
+
+Check if button state has changed
+	If Button is down
+		Post button down event
+	else
+		Post button up event
+Set LastButtonState to current state

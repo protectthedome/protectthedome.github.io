@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Crisis.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   Crisis.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This module controls the crisis LEDs and buzzer. Uses the SR8 module.</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> History</span>
+<span class="hl com"> When           Who     What/Why</span>
+<span class="hl com"> -------------- ---     --------</span>
+<span class="hl com"> 11/9/19 14:10 ram     initial release</span>
+<span class="hl com"> </span>
+<span class="hl com">****************************************************************************/</span>
+
+<span class="hl slc">// the common headers for C99 types </span>
+<span class="hl ppc">#include &lt;stdint.h&gt;</span>
+<span class="hl ppc">#include &lt;stdbool.h&gt;</span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;BITDEFS.H&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">// Libraries</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ShiftRegisterWrite.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Crisis.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">//definitions</span>
+<span class="hl ppc">#define AIRLEAK_LED BIT5HI</span>
+<span class="hl ppc">#define METEOR_LED BIT6HI</span>
+<span class="hl ppc">#define POWER_LED BIT7HI</span>
+
+<span class="hl ppc">#define BUZZER BIT4HI</span>
+
+
+<span class="hl com">/***Public Functions***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">);</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">);</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">);</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Crisis_Buzzer</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">);</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Crisis_Meteor function Description</span>
+<span class="hl com">	Arguments: On/Off</span>
+<span class="hl com">		NOTE: Pass &quot;On&quot; or &quot;Off&quot;, type defines in header</span>
+<span class="hl com">	Returns nothing</span>
+<span class="hl com">	Affects the needed bit on the SR to get the desired crisis state</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//get Current register val</span>
+	<span class="hl kwb">uint8_t</span> NewValue<span class="hl opt">=</span> <span class="hl kwd">SR_GetCurrentRegister</span><span class="hl opt">();</span>
+	
+	<span class="hl slc">//Mask to update bit based on state</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> On<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		NewValue <span class="hl opt">|=</span> METEOR_LED<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl kwa">else if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> Off<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		NewValue <span class="hl opt">&amp;= (~</span>METEOR_LED<span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Write to SR8</span>
+	<span class="hl kwd">SR_Write</span><span class="hl opt">(</span>NewValue<span class="hl opt">);</span>
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Crisis_AirLeak function Description</span>
+<span class="hl com">	Arguments: On/Off</span>
+<span class="hl com">		NOTE: Pass &quot;On&quot; or &quot;Off&quot;, type defines in header</span>
+<span class="hl com">	Returns nothing</span>
+<span class="hl com">	Affects the needed bit on the SR to get the desired crisis state</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//get Current register val</span>
+	<span class="hl kwb">uint8_t</span> NewValue<span class="hl opt">=</span> <span class="hl kwd">SR_GetCurrentRegister</span><span class="hl opt">();</span>
+	
+	<span class="hl slc">//Mask to update bit based on state</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> On<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		NewValue <span class="hl opt">|=</span> AIRLEAK_LED<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl kwa">else if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> Off<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		NewValue <span class="hl opt">&amp;= (~</span>AIRLEAK_LED<span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Write to SR8</span>
+	<span class="hl kwd">SR_Write</span><span class="hl opt">(</span>NewValue<span class="hl opt">);</span>
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Crisis_Power function Description</span>
+<span class="hl com">	Arguments: On/Off</span>
+<span class="hl com">		NOTE: Pass &quot;On&quot; or &quot;Off&quot;, type defines in header</span>
+<span class="hl com">	Returns nothing</span>
+<span class="hl com">	Affects the needed bit on the SR to get the desired crisis state</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//get Current register val</span>
+	<span class="hl kwb">uint8_t</span> NewValue<span class="hl opt">=</span> <span class="hl kwd">SR_GetCurrentRegister</span><span class="hl opt">();</span>
+	
+	<span class="hl slc">//Mask to update bit based on state</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> On<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		NewValue <span class="hl opt">|=</span> POWER_LED<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl kwa">else if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> Off<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		NewValue <span class="hl opt">&amp;= (~</span>POWER_LED<span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Write to SR8</span>
+	<span class="hl kwd">SR_Write</span><span class="hl opt">(</span>NewValue<span class="hl opt">);</span>
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Crisis_Buzzer function Description</span>
+<span class="hl com">	Arguments: On/Off</span>
+<span class="hl com">		NOTE: Pass &quot;On&quot; or &quot;Off&quot;, type defines in header</span>
+<span class="hl com">	Returns nothing</span>
+<span class="hl com">	Affects the needed bit on the SR to get the desired crisis state</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">Crisis_Buzzer</span><span class="hl opt">(</span>UI_State_t state<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//get Current register val</span>
+	<span class="hl kwb">uint8_t</span> NewValue<span class="hl opt">=</span> <span class="hl kwd">SR_GetCurrentRegister</span><span class="hl opt">();</span>
+	
+	<span class="hl slc">//Mask to update bit based on state</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> On<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		NewValue <span class="hl opt">|=</span> BUZZER<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl kwa">else if</span><span class="hl opt">(</span>state <span class="hl opt">==</span> Off<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		NewValue <span class="hl opt">&amp;= (~</span>BUZZER<span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Write to SR8</span>
+	<span class="hl kwd">SR_Write</span><span class="hl opt">(</span>NewValue<span class="hl opt">);</span>
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

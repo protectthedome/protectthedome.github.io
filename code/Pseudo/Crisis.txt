@@ -1,0 +1,50 @@
+Crisis_Meteor function Description
+	Arguments: On/Off
+		NOTE: Pass "On" or "Off"
+	Returns nothing
+	Affects the needed bit on the SR to get the desired crisis state
+
+{
+	get Current register val
+	Mask to update bit based on state
+	Write to SR8
+}
+
+
+Crisis_AirLeak function Description
+	Arguments: On/Off
+		NOTE: Pass "On" or "Off"
+	Returns nothing
+	Affects the needed bit on the SR to get the desired crisis state
+
+{
+	get Current register val
+	Mask to update bit based on state
+	Write to SR8
+}
+
+
+Crisis_Power function Description
+	Arguments: On/Off
+		NOTE: Pass "On" or "Off"
+	Returns nothing
+	Affects the needed bit on the SR to get the desired crisis state
+
+{
+	get Current register val
+	Mask to update bit based on state
+	Write to SR8
+}
+
+
+Crisis_Buzzer function Description
+	Arguments: On/Off
+		NOTE: Pass "On" or "Off"
+	Returns nothing
+	Affects the needed bit on the SR to get the desired crisis state
+
+{
+	get Current register val
+	Mask to update bit based on state
+	Write to SR8
+}

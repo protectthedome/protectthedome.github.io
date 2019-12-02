@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ShiftRegisterWrite_24.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   ShiftRegisterWrite_24.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This module acts as the low level interface to write to 3 cascaded </span>
+<span class="hl com">   shift registers.</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> History</span>
+<span class="hl com"> When           Who     What/Why</span>
+<span class="hl com"> -------------- ---     --------</span>
+<span class="hl com"> 11/5/19 19:51 ram     first pass</span>
+<span class="hl com"> </span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl slc">// the common headers for C99 types </span>
+<span class="hl ppc">#include &lt;stdint.h&gt;</span>
+<span class="hl ppc">#include &lt;stdbool.h&gt;</span>
+
+<span class="hl slc">// the headers to access the GPIO subsystem</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">// the headers to access the TivaWare Library</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/sysctl.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/pin_map.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/timer.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/interrupt.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;termio.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;BITDEFS.H&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">// readability defines</span>
+<span class="hl ppc">#define DATA GPIO_PIN_2</span>
+
+<span class="hl ppc">#define SCLK GPIO_PIN_3</span>
+<span class="hl ppc">#define SCLK_HI BIT3HI</span>
+<span class="hl ppc">#define SCLK_LO BIT3LO</span>
+
+<span class="hl ppc">#define RCLK GPIO_PIN_4</span>
+<span class="hl ppc">#define RCLK_LO BIT4LO</span>
+<span class="hl ppc">#define RCLK_HI BIT4HI</span>
+
+<span class="hl ppc">#define GET_MSB_IN_LSB(x) ((x &amp; 0x800000)&gt;&gt;23)</span>
+<span class="hl ppc">#define ALL_BITS (0xff&lt;&lt;2) </span>
+<span class="hl slc">//   #define TEST</span>
+<span class="hl slc">// an image of the last 8 bits written to the shift register</span>
+<span class="hl kwb">static uint32_t</span> LocalRegisterImage<span class="hl opt">=</span><span class="hl num">0</span><span class="hl opt">;</span>
+
+<span class="hl slc">// Create your own function header comment</span>
+<span class="hl kwb">void</span> <span class="hl kwd">SR24_Init</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">){</span>
+
+  <span class="hl slc">// set up port A by enabling the peripheral clock, waiting for the </span>
+  <span class="hl slc">// peripheral to be ready and setting the direction</span>
+  <span class="hl slc">// of PA2, PA3 &amp; PA4 to output</span>
+  <span class="hl slc">// Turn on PORTA</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>SYSCTL_RCGCGPIO<span class="hl opt">) |=</span> SYSCTL_RCGCGPIO_R0<span class="hl opt">;</span>
+	<span class="hl slc">// Wait for the port clock to come online</span>
+	<span class="hl kwa">while</span><span class="hl opt">((</span><span class="hl kwd">HWREG</span><span class="hl opt">(</span>SYSCTL_PRGPIO<span class="hl opt">)&amp;</span>SYSCTL_PRGPIO_R0<span class="hl opt">) !=</span> SYSCTL_PRGPIO_R0<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Set PA2, PA3, and PA4 as digital outputs</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTA_BASE<span class="hl opt">+</span>GPIO_O_DEN<span class="hl opt">) |= (</span>BIT4HI<span class="hl opt">|</span>BIT3HI<span class="hl opt">|</span>BIT2HI<span class="hl opt">);</span>
+	
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTA_BASE<span class="hl opt">+</span>GPIO_O_DIR<span class="hl opt">) |= (</span>BIT4HI<span class="hl opt">|</span>BIT3HI<span class="hl opt">|</span>BIT2HI<span class="hl opt">);</span>
+	<span class="hl slc">// Leave the configuration for the above ports as totem-poles</span>
+	
+  <span class="hl slc">// start with the data &amp; sclk lines low and the RCLK line high</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTB_BASE<span class="hl opt">+(</span>GPIO_O_DATA<span class="hl opt">+</span>ALL_BITS<span class="hl opt">)) &amp;= (</span>BIT2LO <span class="hl opt">&amp;</span> SCLK_LO<span class="hl opt">);</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTB_BASE<span class="hl opt">+(</span>GPIO_O_DATA<span class="hl opt">+</span>ALL_BITS<span class="hl opt">)) |=</span> RCLK_HI<span class="hl opt">;</span>
+	<span class="hl ppc">#ifdef TEST</span>
+	<span class="hl kwd">puts</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\n\r</span><span class="hl str">Shift Register Hardware Initialized.</span><span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+	<span class="hl ppc">#endif</span>
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl slc">// Create your own function header comment</span>
+<span class="hl kwb">uint32_t</span> <span class="hl kwd">SR24_GetCurrentRegister</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">){</span>
+  <span class="hl kwa">return</span> LocalRegisterImage<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl slc">// Create your own function header comment</span>
+<span class="hl kwb">void</span> <span class="hl kwd">SR24_Write</span><span class="hl opt">(</span><span class="hl kwb">uint32_t</span> NewValue<span class="hl opt">){</span>
+
+  <span class="hl kwb">uint32_t</span> BitCounter<span class="hl opt">;</span>
+  LocalRegisterImage <span class="hl opt">=</span> NewValue<span class="hl opt">;</span> <span class="hl slc">// save a local copy</span>
+
+	<span class="hl slc">// lower the register clock</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTA_BASE<span class="hl opt">+(</span>GPIO_O_DATA<span class="hl opt">+</span>ALL_BITS<span class="hl opt">)) &amp;=</span> RCLK_LO<span class="hl opt">;</span>
+	<span class="hl slc">// Loop through all the bits in dataSR</span>
+	BitCounter <span class="hl opt">=</span> <span class="hl num">24</span><span class="hl opt">;</span>
+	LocalRegisterImage <span class="hl opt">=</span> NewValue<span class="hl opt">;</span> <span class="hl slc">// copy into module var holder for read back</span>
+	<span class="hl kwb">int</span> i<span class="hl opt">=</span><span class="hl num">0</span><span class="hl opt">;</span>
+	<span class="hl kwa">for</span> <span class="hl opt">(</span>i<span class="hl opt">=</span><span class="hl num">0</span><span class="hl opt">;</span>i<span class="hl opt">&lt;</span>BitCounter<span class="hl opt">;</span> i<span class="hl opt">++)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">// Isolate the MSB of NewValue, put it into the LSB position and output to port</span>
+		<span class="hl slc">// shift out the data while pulsing the serial clock </span>
+		<span class="hl slc">// Isolate the MSB of NewValue, put it into the LSB position and output to port</span>
+		<span class="hl kwa">if</span><span class="hl opt">(</span>NewValue<span class="hl opt">&amp;</span>BIT23HI<span class="hl opt">)</span> 
+		<span class="hl opt">{</span>
+			<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTA_BASE<span class="hl opt">+(</span>GPIO_O_DATA<span class="hl opt">+</span>ALL_BITS<span class="hl opt">)) |=</span> BIT2HI<span class="hl opt">;</span>
+		<span class="hl opt">}</span>
+		<span class="hl kwa">else</span><span class="hl opt">{</span>
+			<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTA_BASE<span class="hl opt">+(</span>GPIO_O_DATA<span class="hl opt">+</span>ALL_BITS<span class="hl opt">)) &amp;=</span> BIT2LO<span class="hl opt">;</span>
+		<span class="hl opt">}</span>
+		<span class="hl slc">// Pulse PA3</span>
+		<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTA_BASE<span class="hl opt">+(</span>GPIO_O_DATA<span class="hl opt">+</span>ALL_BITS<span class="hl opt">)) |=</span> SCLK_HI<span class="hl opt">;</span> <span class="hl slc">// raise SCLK</span>
+		<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTA_BASE<span class="hl opt">+(</span>GPIO_O_DATA<span class="hl opt">+</span>ALL_BITS<span class="hl opt">)) &amp;=</span> SCLK_LO<span class="hl opt">;</span> <span class="hl slc">// lower SCLK</span>
+		<span class="hl slc">// Shift dataSR left 1 bit</span>
+		NewValue <span class="hl opt">=</span> NewValue <span class="hl opt">&lt;&lt;</span> <span class="hl num">1</span><span class="hl opt">;</span> 
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Pulse PB2</span>
+
+<span class="hl slc">// finish looping through bits in NewValue</span>
+<span class="hl slc">// raise the register clock to latch the new data</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTA_BASE<span class="hl opt">+(</span>GPIO_O_DATA<span class="hl opt">+</span>ALL_BITS<span class="hl opt">)) |=</span> RCLK_HI<span class="hl opt">;</span> 
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

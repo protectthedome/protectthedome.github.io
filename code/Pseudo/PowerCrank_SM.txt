@@ -1,0 +1,59 @@
+//Pseudocode for PowerCrank_SM.c
+
+InitPowerCrank_SM -
+
+Initialize crank hardware
+Set CurrentSMState to Idle_PC
+
+
+RunPowerCrank_SM -
+
+If CurrentSMState is NotCranking
+	If Event is FallingEdge
+		Init timer
+		Set CurrentSMState to NotCranking
+	else if Event is RST or End_Of_Game
+		Set CurrentSMState to Idle_PC
+		Reset counter
+
+else if CurrentSMState is Cranking
+	If Event is RST or End_Of_Game
+		Reset counter
+		Set CurrentSMState to Idle_PC
+	else if Event is Rising Edge
+		Set CurrentSMState to NotCranking
+	else if Event is ES_Timeout		
+		if (counter < MAX_COUNT)
+			Increment counter
+			Init timer
+			Move power gauge
+		else
+			Post Interaction_Completed
+			Post Power_Complete
+			Reset counter
+			Set CurrentSMState to Idle_PC
+
+else if CurrentSMState is Idle_PC
+	if Event is Low Power
+		If (crank is high)
+			Set CurrentSMState to Cranking
+			Init timer
+		else
+			Set CurrentSMState to NotCranking
+			
+	else if Event is Tot_Inserted
+		Move power gauge to beginning
+		Reset counter
+	
+
+
+CheckPowerCrankEvents -
+
+Get current power crank state
+If CurrentState is different from LastState
+	If Current state is high
+		Post Rising Edge event
+	else
+		Post Falling Edge event
+Set LastState to CurrentState
+

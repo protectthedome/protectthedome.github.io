@@ -1,0 +1,53 @@
+//Pseudocode for Cannon_SM.c
+
+InitCannon_SM -
+
+Initialize cannon hardware
+Current current cannon pot value and move cannon to location
+Set CurrentSMState to IdleNotPlaying
+
+RunCannon_SM -
+If CurrentSMState is IdleNotPlaying
+	If Event is Power_Complete
+		Set CurrentSMState to IdlePlaying
+
+else if CurrentSMState is IdlePlaying
+	If Event is RST or End_of_Game
+		Set CurrentSMState to IdleNotPlaying
+	else if Event is Meteor_Destroyed
+		Init timer
+		Vibrate cannon
+		Set CurrentSMState to KnobVibrating
+	else if Event is Cannon_Button_Down
+		Turn on cannon LED
+		Init timer
+		Set CurrentSMState to LEDLit
+	else if Event is New_Pot_Value
+		Adjust cannon to new position
+
+else if CurrentSMState is LEDLit
+	If Event is RST or End_of_Game
+		Set CurrentSMState to IdleNotPlaying
+		Turn cannon LED off
+	else if Event is ES_Timeout
+		Turn cannon LED off
+		Set CurrentSMState to IdlePlaying
+
+else if CurrentSMState is KnobVibrating
+	If Event is RST or End_of_Game
+		Set CurrentSMState to IdleNotPlaying
+		Turn vibrate off
+	else if Event is ES_Timeout
+		Turn vibrate off
+		Set CurrentSMState to IdlePlaying
+
+
+PotChecker -
+
+Query potentiometer value
+If pot value has changed by more than threshold
+	Post new pot value event
+	Update LastPotValue
+
+
+		

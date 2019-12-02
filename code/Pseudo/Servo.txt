@@ -1,0 +1,115 @@
+/**********
+Pseudo code for the Servo Library.
+This module acts as the low level interface to move the servo motors using
+PWM functions.
+***********/
+
+Include headers
+Include Libraries needed (PWM16Tiva.h)
+Define public functions prototypes
+  Servo_HWInit
+  Servo_MoveCannon
+  Servo_MoveO2Gauge
+  Servo_MoveTOT
+  Servo_MoveTimer
+  Servo_MovePowerGauge
+  QueryServoPosition
+
+Define private functions prototypes
+  Count2Ticks
+  Period2Tick
+
+Module Variables
+  ServoPositions[5] // each element for each servo
+
+Initialization function: Servo_HWInit(no param)
+	Initialize the channels (library function PWM_TIVA_Init(NUM_SERVOS))
+	Set period for the cannon and timer servo (library function PWM_TIVA_SetPeriod)
+	Set period for gauge servos (library function PWM_TIVA_SetPeriod)
+	Set period for TOT servo (library function PWM_TIVA_SetPeriod)
+	Return state of initialization, true if all initialization where successful
+End function
+
+Function Servo_MoveCannon (param: ServoCount)
+	If ServoCount above range
+		Return false
+	End if
+	Convert ServoCount to Ticks with Count2Ticks()
+	Set pulse width on CANNON_SERVO PWM channel (library function PWM_TIVA_SetPulseWidth(TickCount, CANNON_SERVO)), save boolean returned as Status
+  If servo position was updated
+  	ServoPositions[CANNON_SERVO] equals ServoCount
+	End if
+	Return Boolean indicating if servo position was updated
+End function
+
+Function Servo_MoveTimer(param: ServoCount)
+  If ServoCount above range
+    Return false
+  End if
+  Convert ServoCount to Ticks with Count2Ticks()
+	Set pulse width on TIMER_SERVO PWM channel (library function PWM_TIVA_SetPulseWidth(TickCount, TIMER_SERVO)), save boolean returned as Status
+  If servo position was updated
+  	ServoPositions[TIMER_SERVO] equals ServoCount
+	End if
+	Return Boolean indicating if servo position was updated
+End Function
+
+Function Servo_MoveO2Gauge(param: ServoCount)
+  If ServoCount above range
+    Return false
+  End if
+  Convert ServoCount to Ticks with Count2Ticks()
+  Set pulse width calling library function PWM_TIVA_SetPulseWidth(TickCount, O2_GAUGE_SERVO), save boolean returned as Status
+  If Status is true
+    ServoPositions[O2_GAUGE_SERVO] equals ServoCount
+  End if
+  Return Status
+End function
+
+Function Servo_MovePowerGauge(param: ServoCount)
+  If ServoCount above range
+    Return false
+  End if
+  Convert ServoCount to Ticks with Count2Ticks()
+  Set pulse width calling library function PWM_TIVA_SetPulseWidth(TickCount, POWER_GAUGE_SERVO), save boolean returned as Status
+  If Status is true
+    ServoPositions[POWER_GAUGE_SERVO] equals ServoCount
+  End if
+  Return Status
+End function
+
+Function Servo_MoveTOT(param: ServoCount)
+  If ServoCount above range
+    Return false
+  End if
+  Convert ServoCount to Ticks with Count2Ticks()
+  Set pulse width calling library function PWM_TIVA_SetPulseWidth(TickCount, TOT_SERVO), save boolean returned as Status
+  If Status is true
+    ServoPositions[TOT_SERVO] equals ServoCount
+  End if
+  Return Status
+End function
+
+
+Function QueryServoPosition(param Which)
+	Create variable CurrentPosition, set to 0xFF by default
+	If Which less than NUM_SERVOS
+		CurrentPosition equals ServoPositions[Which];
+	End if
+	Return CurrentPosition
+End function
+
+
+Function Count2Ticks(params: ServoCount, HiLimit, LoLimit)
+  Initialize variables TickRange and TickCount
+	Determine the tick range of the servo as TickRange = HiLimit - LoLimit
+	Create variable ratio = (double)ServoCount/100.0
+	TickCount equals ratio*TickRange+LoLimit
+  Return TickCount
+End function
+
+Function Period2Tick(param Period_ms)
+  Convert Period_ms to us
+	Transform Period in us to Ticks
+	Return Ticks value
+End Function

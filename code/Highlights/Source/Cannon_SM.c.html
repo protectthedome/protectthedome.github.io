@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Cannon_SM.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   Cannon_SM.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This is the first service for cannon state machine under the</span>
+<span class="hl com">   Gen2 Events and Services Framework.</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl com">/*----------------------------- Include Files -----------------------------*/</span>
+<span class="hl com">/* include header files for this service</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon_SM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include &lt;string.h&gt;</span>
+<span class="hl ppc">#include &lt;stdlib.h&gt;</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Servo.h&quot;</span><span class="hl ppc"></span>
+
+
+<span class="hl com">/* include header files for hardware access</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl com">/* include header files for the framework</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Configure.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Framework.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_DeferRecall.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_ShortTimer.h&quot;</span><span class="hl ppc"></span>
+
+
+<span class="hl com">/*----------------------------- Module Defines ----------------------------*/</span>
+<span class="hl slc">// these times assume a 1.000mS/tick timing</span>
+<span class="hl ppc">#define ONE_SEC 1000</span>
+<span class="hl ppc">#define HALF_SEC (ONE_SEC/2)</span>
+<span class="hl ppc">#define TWO_SEC (ONE_SEC*2)</span>
+<span class="hl ppc">#define FIVE_SEC (ONE_SEC*5)</span>
+<span class="hl kwb">uint16_t</span> DELTA <span class="hl opt">=</span> <span class="hl num">3</span><span class="hl opt">*(</span>COUNT_UPPER_LIM<span class="hl opt">-</span>COUNT_LOWER_LIM<span class="hl opt">)/</span><span class="hl num">100.0</span><span class="hl opt">;</span>
+
+
+<span class="hl com">/*---------------------------- Module Functions ---------------------------*/</span>
+<span class="hl com">/* prototypes for private functions for this service.They should be functions</span>
+<span class="hl com">   relevant to the behavior of this service</span>
+<span class="hl com">*/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">PotChecker</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+
+<span class="hl com">/*---------------------------- Module Variables ---------------------------*/</span>
+<span class="hl slc">// with the introduction of Gen2, we need a module level Priority variable</span>
+<span class="hl kwb">static uint8_t</span> MyPriority<span class="hl opt">;</span>
+<span class="hl kwb">static</span> Cannon_SMState_t CurrentSMState<span class="hl opt">;</span>
+<span class="hl kwb">static uint16_t</span> CurrentCannonADCount<span class="hl opt">;</span>
+
+
+<span class="hl slc">// add a deferral queue for up to 3 pending deferrals +1 to allow for overhead</span>
+<span class="hl kwb">static</span> ES_Event_t DeferralQueue<span class="hl opt">[</span><span class="hl num">3</span><span class="hl opt">+</span><span class="hl num">1</span><span class="hl opt">];</span>
+
+<span class="hl com">/*------------------------------ Module Code ------------------------------*/</span>
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     InitCannon_SM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     uint8_t : the priorty of this service</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool, false if error in initialization, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Saves away the priority, and does any </span>
+<span class="hl com">     other required initialization for this service</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     J. Edward Carryer, 01/16/12, 10:00</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">InitCannon_SM</span> <span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  
+  ES_Event_t ThisEvent<span class="hl opt">;</span>
+  MyPriority <span class="hl opt">=</span> Priority<span class="hl opt">;</span>
+  
+  <span class="hl slc">//Init cannon hardware</span>
+  <span class="hl kwd">Cannon_HWInit</span><span class="hl opt">();</span>
+ 
+  <span class="hl slc">//Initialize cannon position</span>
+  CurrentCannonADCount <span class="hl opt">=</span> <span class="hl kwd">Cannon_GetPotValue</span><span class="hl opt">();</span>
+  <span class="hl kwd">Cannon_UserPosition</span><span class="hl opt">(</span>CurrentCannonADCount<span class="hl opt">);</span>  
+  
+  <span class="hl slc">//Set SM currentstate</span>
+  CurrentSMState <span class="hl opt">=</span> IdleNotPlaying<span class="hl opt">;</span>
+  
+  <span class="hl slc">//Intialzie Deferral Queue</span>
+  <span class="hl kwd">ES_InitDeferralQueueWith</span><span class="hl opt">(</span>DeferralQueue<span class="hl opt">,</span> <span class="hl kwd">ARRAY_SIZE</span><span class="hl opt">(</span>DeferralQueue<span class="hl opt">));</span>
+  
+    <span class="hl slc">// post the initial transition event</span>
+  ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_INIT<span class="hl opt">;</span>
+  <span class="hl kwa">if</span> <span class="hl opt">(</span><span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span>MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">) ==</span> <span class="hl kwa">true</span><span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwa">return true</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+  <span class="hl kwa">else</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwa">return false</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+  
+<span class="hl opt">}</span>
+
+
+
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     PostCannon_SM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     EF_Event ThisEvent ,the event to post to the queue</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool false if the Enqueue operation failed, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Posts an event to this state machine&#39;s queue</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> Author</span>
+<span class="hl com">     J. Edward Carryer, 10/23/11, 19:25</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">PostCannon_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwa">return</span> <span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span> MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">    RunCannon_SM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">   ES_Event_t : the event to process</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">   ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   add your description here</span>
+<span class="hl com"> Notes</span>
+<span class="hl com">   </span>
+<span class="hl com"> Author</span>
+<span class="hl com">   J. Edward Carryer, 01/15/12, 15:23</span>
+<span class="hl com">****************************************************************************/</span>
+ES_Event_t <span class="hl kwd">RunCannon_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl slc">//ES_Event_t NewEvent;</span>
+  ES_Event_t ReturnEvent<span class="hl opt">;</span>
+  ReturnEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_NO_EVENT<span class="hl opt">;</span>
+  UI_State_t CannonState<span class="hl opt">;</span>
+  
+  
+  <span class="hl kwa">switch</span> <span class="hl opt">(</span>CurrentSMState<span class="hl opt">) {</span>
+    <span class="hl kwa">case</span> IdleNotPlaying<span class="hl opt">:</span> 
+	<span class="hl slc">//If power has been regenerated</span>
+	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Power_Complete<span class="hl opt">) {</span>
+		<span class="hl slc">//Update SM State</span>
+		CurrentSMState <span class="hl opt">=</span> IdlePlaying<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+	<span class="hl kwa">case</span> IdlePlaying<span class="hl opt">:</span>
+	<span class="hl slc">//If RST or end of game event</span>
+	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> RST <span class="hl opt">||</span> ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> End_Of_Game<span class="hl opt">) {</span>
+		<span class="hl slc">//Update SM state</span>
+		CurrentSMState <span class="hl opt">=</span> IdleNotPlaying<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//else if meteor is destroyed</span>
+	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Meteor_Destroyed<span class="hl opt">) {</span>
+    <span class="hl slc">//printf(&quot;\rMeteor Destroyed\r\n&quot;); </span>
+		<span class="hl slc">//Start timer</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>CANNON_TIMER<span class="hl opt">,</span> <span class="hl num">1500</span><span class="hl opt">);</span>
+		<span class="hl slc">//Start vibratory motor</span>
+		CannonState <span class="hl opt">=</span> On<span class="hl opt">;</span>
+		<span class="hl kwd">Cannon_Vibrate</span><span class="hl opt">(</span>CannonState<span class="hl opt">);</span>
+    
+		<span class="hl slc">//Update current state</span>
+		CurrentSMState <span class="hl opt">=</span> KnobVibrating<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//else if cannon button is pressed</span>
+	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Cannon_Button_Down<span class="hl opt">) {</span>
+		<span class="hl slc">//Start timer</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>CANNON_TIMER<span class="hl opt">,</span> <span class="hl num">500</span><span class="hl opt">);</span>
+		<span class="hl slc">//Turn on LED</span>
+		CannonState <span class="hl opt">=</span> On<span class="hl opt">;</span>
+		<span class="hl kwd">Cannon_LED</span><span class="hl opt">(</span>CannonState<span class="hl opt">);</span>
+		<span class="hl slc">//Update SM state</span>
+		CurrentSMState <span class="hl opt">=</span> LEDLit<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Else if we receive a new pot value</span>
+	<span class="hl kwa">else if</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> New_Pot_Value<span class="hl opt">) {</span>
+     <span class="hl slc">//printf(&quot;move to new pot value %u\n\r&quot;,ThisEvent.EventParam);</span>
+		<span class="hl slc">//Position cannon</span>
+		<span class="hl kwd">Cannon_UserPosition</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventParam<span class="hl opt">);</span>		
+	<span class="hl opt">}</span>
+	<span class="hl kwa">break</span><span class="hl opt">;</span>
+	<span class="hl kwa">case</span> LEDLit<span class="hl opt">:</span>
+	<span class="hl slc">//If RST or end of game event</span>
+	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> RST <span class="hl opt">||</span> ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> End_Of_Game<span class="hl opt">) {</span>
+		<span class="hl slc">//Update SM state</span>
+		CurrentSMState <span class="hl opt">=</span> IdleNotPlaying<span class="hl opt">;</span>
+		<span class="hl slc">//Turn off LED</span>
+		CannonState <span class="hl opt">=</span> Off<span class="hl opt">;</span>
+		<span class="hl kwd">Cannon_LED</span><span class="hl opt">(</span>CannonState<span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//else if we get a timeout</span>
+	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">) {</span>
+		<span class="hl slc">//Update SM state</span>
+		CurrentSMState <span class="hl opt">=</span> IdlePlaying<span class="hl opt">;</span>
+		<span class="hl slc">//Turn off LED</span>
+		CannonState <span class="hl opt">=</span> Off<span class="hl opt">;</span>
+		<span class="hl kwd">Cannon_LED</span><span class="hl opt">(</span>CannonState<span class="hl opt">);</span>
+    <span class="hl kwd">ES_RecallEvents</span><span class="hl opt">(</span>MyPriority<span class="hl opt">,</span> DeferralQueue<span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+  <span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Meteor_Destroyed<span class="hl opt">)</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwd">ES_DeferEvent</span><span class="hl opt">(</span>DeferralQueue<span class="hl opt">,</span> ThisEvent<span class="hl opt">);</span>
+    <span class="hl opt">}</span>
+	<span class="hl kwa">break</span><span class="hl opt">;</span>
+	<span class="hl kwa">case</span> KnobVibrating<span class="hl opt">:</span>
+		<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> RST <span class="hl opt">||</span> ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> End_Of_Game<span class="hl opt">) {</span>
+		<span class="hl slc">//Update SM state</span>
+		CurrentSMState <span class="hl opt">=</span> IdleNotPlaying<span class="hl opt">;</span>
+		<span class="hl slc">//Turn off vibratory motor </span>
+		CannonState <span class="hl opt">=</span> Off<span class="hl opt">;</span>
+		<span class="hl kwd">Cannon_Vibrate</span><span class="hl opt">(</span>CannonState<span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//else if we get a timeout</span>
+	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">) {</span>
+		<span class="hl slc">//Update SM state</span>
+		CurrentSMState <span class="hl opt">=</span> IdlePlaying<span class="hl opt">;</span>
+		<span class="hl slc">//Turn off vibratory motor</span>
+		CannonState <span class="hl opt">=</span> Off<span class="hl opt">;</span>
+		<span class="hl kwd">Cannon_Vibrate</span><span class="hl opt">(</span>CannonState<span class="hl opt">);</span>
+	<span class="hl opt">}</span>
+	<span class="hl kwa">break</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+ 
+  <span class="hl kwa">return</span> ReturnEvent<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***************************************************************************</span>
+<span class="hl com"> private functions</span>
+<span class="hl com"> ***************************************************************************/</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">PotChecker</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">) {</span>
+  ES_Event_t NewEvent<span class="hl opt">;</span>
+  <span class="hl kwb">bool</span> ReturnVal <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
+  
+  <span class="hl slc">//Get AD Pot value</span>
+  <span class="hl kwb">uint16_t</span> ADPotVal <span class="hl opt">=</span> <span class="hl kwd">Cannon_GetPotValue</span><span class="hl opt">();</span>
+  
+  <span class="hl slc">//If pot has been turned more than 1%</span>
+  <span class="hl kwa">if</span> <span class="hl opt">(</span><span class="hl kwd">abs</span><span class="hl opt">(</span>ADPotVal<span class="hl opt">-</span>CurrentCannonADCount<span class="hl opt">) &gt;</span> DELTA<span class="hl opt">) {</span>
+	  <span class="hl slc">//printf(&quot;\rNew Pot Value!\r\n&quot;);</span>
+    <span class="hl slc">//Post to service</span>
+	  NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> New_Pot_Value<span class="hl opt">;</span>
+	  NewEvent<span class="hl opt">.</span>EventParam <span class="hl opt">=</span> ADPotVal<span class="hl opt">;</span>
+	  <span class="hl kwd">PostCannon_SM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
+	  ReturnVal <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span>
+	  <span class="hl slc">//Update AD value</span>
+	  CurrentCannonADCount <span class="hl opt">=</span> ADPotVal<span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+   
+   <span class="hl kwa">return</span> ReturnVal<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+
+ 
+<span class="hl com">/*------------------------------- Footnotes -------------------------------*/</span>
+<span class="hl com">/*------------------------------ End of file ------------------------------*/</span>
+
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

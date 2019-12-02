@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Protect the Dome- Electrical Design</title>
+    <!-- Bootstrap -->
+    <link href="css/bootstrap-4.3.1.css" rel="stylesheet">
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
+          <li class="nav-item ">
+            <a class="nav-link" href="index.html">Home <span class="sr-only">(current)</span></a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="mechanical.html">Mechanical</a>
+          </li>
+			<li class="nav-item active">
+            <a class="nav-link" href="electrical.html">Electrical</a>
+          </li>
+						<li class="nav-item">
+            <a class="nav-link" href="software.html">Software</a>
+          </li>
+			<li class="nav-item">
+            <a class="nav-link" href="bom.html">Bill of Materials</a>
+          </li>
+			<li class="nav-item">
+            <a class="nav-link" href="gems.html">Gems of Wisdom</a>
+          </li>          
+        </ul>
+        <form class="form-inline my-2 my-lg-0">
+        </form>
+      </div>
+    </nav>
+    <section>
+      
+        <div class="container-fluid">
+
+				<img src="images/banner.png"   class="img-fluid"  width: 100% \9>
+
+        </div>
+      
+  </section>
+    <section>
+      <div class="container">
+        <div class="row">
+          <div class="col-12 text-center">
+            </br></br>
+			  <h1>Electrical Design</h1>
+            
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1">TIVA Launchpad Pin Assignments</h4>
+			<p> TIVA Launchpad Pin Assignments A Tiva™ </p>
+			<p>TM4C123GH6PM was used as the microcontroller. </p>
+          </div>
+		</div>
+        <div class="row">
+          <div class="col-5">          
+			   <img src="images/circuits/tiva_pins.png" style="width:100%">
+			  </div>
+			
+			 <div class="col-7">
+            <table style="width:100%">
+  <tr>
+    <th>Pin</th>
+    <th>Type</th> 
+    <th>Purpose</th>
+  </tr>
+  <tr><td>PB0</td><td>Digital Output</td><td>Serial Data for SR8</td></tr>
+  <tr><td>PB2</td><td>Digital Output</td><td>Register Clock for SR8</td></tr>
+ <tr><td>PB4</td><td>PWM</td><td>Servo control - Oxygen Gauge</td></tr>
+ <tr><td>PB5</td><td>PWM</td><td>Servo control - Power Gauge</td></tr>
+ <tr><td>PB6</td><td>PWM</td><td>Servo control - Cannon</td></tr>
+ <tr><td>PB7</td><td>PWM</td><td>Servo control - Rocket Timer</td></tr>
+ 
+ <tr><td>PA2</td><td>Digital Output</td><td>Serial Data for SR24</td></tr>
+ <tr><td>PA3</td><td>Digital Output</td><td>Serial Clock for SR24</td></tr>
+ <tr><td>PA4</td><td>Digital Output</td><td>Register Clock for SR24</td></tr>
+<tr><td>PC5</td><td>Digital Input</td><td>Cannon Push Button</td></tr>
+ <tr><td>PC6</td><td>Digital Output</td><td>Cannon LED</td></tr>
+ <tr><td>PC7</td><td>Digital Output</td><td>Vibration Motor</td></tr>
+ 
+ <tr><td>PE0</td><td>Analog Input</td><td>Read Pot</td></tr>
+ <tr><td>PE4</td><td>PWM</td><td>Servo control - TOT release</td></tr>
+ 
+ <tr><td>PD0</td><td>Digital Input</td><td>IR Beam- TOT</td></tr>
+ <tr><td>PD1</td><td>Digital Input</td><td>Hall - Air Leak 1</td></tr>
+ <tr><td>PD2</td><td>Digital Input</td><td>Hall - Air Leak 2</td></tr>
+ <tr><td>PD3</td><td>Digital Input</td><td>Hall - Air Leak 3</td></tr>
+
+ <tr><td>PD6</td><td>Digital Input</td><td>Power Crank</td></tr>
+
+</table>
+
+
+      </div>
+</div>
+			  
+      </div>
+    </section>
+<br></br>
+<br></br>
+<br></br>
+
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1">TOT System</h4>
+			<p> In order to play the game, the user has to inserts a TOT (stainless steel fender washer) into the game, much like a token at an arcade house. To detect the presence of the TOT, an optical approach was used. An IR beam would shine onto a photoreceiver and would produce a high signal when the IR beam was detected, and a low signal when it wasn’t. When the TOT is inserted, it breaks the beam, resulting in a falling edge, which could be checked for. </p>
+			<p>To keep the TOT from rolling all the way to the retrieval point before the game is over, a servo was mounted such that the servo horn obstructed the TOT's path and held it partway through the channel.&nbsp;</p>
+<div class="text-center">
+		  <img src="images/circuits/tot_circuit.png" style="width:60%">
+		  </div>
+			  
+			  </div>
+		</div>
+        
+			  
+      </div>
+    </section>
+<br></br>
+<br></br>
+<br></br>
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1">Power Crank</h4>
+			<p>The crank interaction relied on the user spinning a brushed DC motor, which produces a voltage across its terminals. Since there was no guarantee which direction the user would turn the motor, its output terminals were connected to a full bridge rectifier to ensure only a positive signal would be produced. </p>
+			<p>The output of the rectifier was then run through a divider consisting of a fixed 10k resistor connected to the positive output of the rectifier and a 10k potentiometer connected to ground. The common node between both was connected to a unity gain buffer (LM324N) whose output went into a low pass filter to create a voltage mirror. This prevents the impedance of the divider circuit form affecting the low pass filter. The values of the C and R were chosen empirically, seeing what cutoff frequency would best squash the noise observed in the signal.</p>
+			<p>Finally, the analog singnal went into a 74HCT14, which produces a digital output. The resistance of the 10k potentiometer was then tuned to determine at what speed the user would need to turn the crank to result in a transition (falling edge) from the 74HCT14. </p>
+			<p>A power gauge on the control panel provides a visual indication of the power level achieved by the user turning the crank. This gauge was actuated by a servo motor.&nbsp; &nbsp; &nbsp;</p>
+<div class="text-center">
+		  <img src="images/circuits/power_crank_circuit.png" style="width:70%"> 
+				
+		  </div>
+			  
+		    </div>
+		</div>
+        
+			  
+      </div>
+    </section>
+<br></br>
+<br></br>
+<br></br>
+
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1">Meteorites</h4>
+			<p> Falling meteorites were simulated using 3 banks of 8 LEDs each. In order to control these LEDs, 3 74HCT595 shift registers where cascaded to produce an effective 24 bit shift register. Each 595 was dedicated to a specific bank. Since the current being sourced into the LEDs was well within the output limits of the 595, no transistors were required as the LEDs were connected directly to the outputs. </p>
+			
+			<div class="text-center">
+			  <img src="images/circuits/meteor_circuit.png" style="width:90%">
+				
+			  </div>
+			 <h6 class="mt-0 mb-1">Meteor PCB</h6>
+In order to save on cabling, and the inevitable nightmare of debugging a large rat’s nest of wires, we decided to create a PCB for each of the meteorite banks. The PCB contains 8 LEDs, arranged linearly (1” apart), a shift register, and a 74HCT14 inverter. There were 3 connections on the PCB: power, input to the shift register, and an output from the shift register for cascading. The 74HCT14 was used to ensure the shift register received clean square waves on the data, serial clock and register clock lines. This was done since there are long cables running from the PCBs to the TiVa.
+			  			<div class="text-center">
+			  <img src="images/circuits/meteor_PCB_circuit.png" style="width:90%">
+			<br></br>
+			<img src="images/circuits/meteor_PCB_layout.png" style="width:90%">
+				
+			  </div>
+
+		    </div>
+		</div>
+        
+			  
+      </div>
+    </section>
+<br></br>
+<br></br>
+<br></br>
+
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1">Cannon position, button and vibratory feedback</h4>
+			<p> The cannon position is controlled by a potentiometer. The voltage at the sweep is the desired output signal to be read. In order to reduce the effect of PSR, a 10uF capacitor was placed from the sweep to ground to act as a decoupling cap. The signal is connected to a unity gain buffer (MCP6294) into a low pass to create a voltage mirror. This prevents the impedance of the divider circuit form affecting the low pass filter. The low pass filter was used to help reduce any noise picked up by the cabling from the potentiometer to the breadboard.</p>
+			<p>The cannon is actuated by a servo motor. The power to the servo motors was bypassed using 220uF capacitors near the servos.</p>
+			<p>To fire the cannon, the user presses a momentary button. The button was wired directly into the TiVa, and the pin on the TiVa was set up using an internal pull-up. When the button is pressed a blue LED in the cannon tip is lit by turning on Q9. If the user shoots down the meteorite, the knob where the potentiometer is held, vibrates. This is controlled by turning on Q8. 
+</p>
+			
+			<div class="text-center">
+			  <img src="images/circuits/cannon_circuit.png" style="width:90%">
+				
+		    </div>
+			  
+		    </div>
+		</div>
+        
+			  
+      </div>
+    </section>
+<br></br>
+<br></br>
+<br></br>
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1">Timer Display</h4>
+			<p> The timer display is actuated by a servo motor.</p>
+			
+			<div class="text-center">
+			  <img src="images/circuits/timer_circuit.png" style="width:20%">
+				
+			  </div>
+			  
+		    </div>
+		</div>
+        
+			  
+      </div>
+    </section>
+<br></br>
+<br></br>
+<br></br>
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1">Warning LED and buzzer</h4>
+			<p> The warning LED and buzzer are controlled by a shift register (74HCT595). Due to the relatively high current demand of the LEDs and buzzer, low side drive was used, with the outputs of the shift register connected to the gates of the MOSFETs. To further save on pins, the first 3 outputs controlled the 3 fans of the air leak.</p>
+			
+			<div class="text-center">
+			  <img src="images/circuits/warning_circuit.png" style="width:70%">
+				
+			  </div>
+			  
+		    </div>
+		</div>
+        
+			  
+      </div>
+    </section>
+<br></br>
+<br></br>
+<br></br>
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1">Air Leak Circuit</h4>
+			<p>The Air Leak game requires 3 hall switches, 3 fans and 1 servo motor. The hall switches used an open drain output, which was wired directly into the TiVa, with said pins configured with internal pull-ups. Measurements were taken to ensure the rise-time was adequate </p>
+			<p>The servo motor controls the oxygen gauge.</p>			
+			<p>The control signal for the fans came from the shift register that controls the warning LEDs. 
+</p>
+<div class="text-center">
+		  <img src="images/circuits/airleak_circuit.png" style="width:90%">
+				
+		  </div>
+			  
+		    </div>
+		</div>
+        
+			  
+      </div>
+    </section>
+
+
+
+    <hr>
+    
+    
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="js/jquery-3.3.1.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="js/popper.min.js"></script>
+    <script src="js/bootstrap-4.3.1.js"></script>
+  </body>
+</html>

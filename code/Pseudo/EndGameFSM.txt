@@ -1,0 +1,146 @@
+/****************************************************************************
+Pseudo code for EndGameFSM.c
+This module controls the behavior of the arcade when the game ends.
+This includes the case where the user wins and when the user loses.
+****************************************************************************/
+
+Include Headers and relevant Libraries
+
+Module defines
+  WIN_DELAY
+  LOSE_DELAY
+  LED_MOD
+  OFF_DELAY
+
+Define module variables
+  CurrentState
+  MyPriority
+  counter
+  position
+  ToggleOn (initialize as true)
+  CannonDirection
+
+Function InitEndGameFSM
+Takes in the Priority of the service, returns success boolean
+
+  Set MyPriority to Priority
+  Set CurrentState to InitPState_E
+  Post initial transition event
+  Return true if successfully posted
+
+Function PostEndGameFSM
+Takes in ThisEvent, returns success boolean
+
+  Post event to service corresponding to MyPriority
+  Return true if successful
+
+Function RunEndGameFSM
+Takes in ThisEvent, returns nothing
+
+  Create event variable ReturnEvent of type ES_NO_EVENT
+  If CurrentState is InitPState_E
+    If ThisEvent is of type ES_INIT
+      Set CurrentState to Idle_E
+    End If
+  End If
+  If CurrentState is Idle_E
+    If ThisEvent is of type End_Of_Game
+      If ThisEvent has parameter WIN
+        Start a timer for WIN_DELAY
+        Return the TOT
+        Turn the crisis buzzer off
+        Initialize counter to the number of LEDs in each meteor bank
+        Initialize position to 0
+        Move the cannon to the first position
+        Set CurrentState to HappyDance
+      End If
+      If ThisEvent has parameter GAME_OVER
+        Start a timer for LOSE_DELAY
+        Release the TOT
+        Turn the crisis buzzer off
+        Create variable CannonPosFromUp
+        Set CannonPosFromUp to the cannon's distance from upright
+        If the cannon is to the right of upright
+          Set CannonDirection to true
+        Else
+          Set CannonDirection to false
+        End If
+        Set counter to the max of the current air guage level, power guage level, or cannon position from upright
+        Set CurrentState to SadDance
+      End If
+    End If
+  If CurrentState is HappyDance
+    If ThisEvent is of type ES_TIMEOUT
+      If counter is greater than 0
+        If counter is equal to the number of LEDs per meteor bank
+          Light up the cannon LED
+        Else
+          Make sure the cannon LED is off
+        End If
+        Increment the lit LED in each meteor bank by 1 away from the dome
+        Decrement counter by 1
+        Start a timer with WIN_DELAY
+      Else If counter is 0 and position is less than 3
+        Increment position
+        Move the cannon to the next bank
+        Reset the counter to the number of LEDs per meteor bank
+        If position is now at 3
+          Turn off all meteor LEDs
+          Turn off all crisis indicator LEDs
+          Start a timer for OFF_DELAY
+        Else
+          Start a timer for WIN_DELAY
+        End If
+      Else If position is 3
+        Post event Go_Welcome mode to WelcomeFSM
+        Set CurrentState to Idle_E
+      End If
+    Else If ThisEvent is of type Tot_Inserted
+      Turn off all meteor LEDs
+      Turn off all crisis indicator LEDs
+      Set CurrentState to Idle_E
+    End If
+  If CurrentState is SadDance
+    If ThisEvent is of type ES_TIMEOUT
+      If counter is 0
+        Post event Go_Welcome_Mode to WelcomeFSM
+        Set CurrentState to Idle_E
+      Else If counter is greater than 0
+        Initialize a variable NewCannonPos to the current cannon position
+        If CannonDirection is true
+          Decrement NewCannonPos by 1
+          Move the cannon to NewCannonPos
+        Else
+          Increment NewCannonPos by 1
+          Move the cannon to NewCannonPos
+        End If
+        Decrement the air and cannon guage levels by 1
+        If ToggleOn is true
+          Light the LED closest to the dome in each bank
+          Turn on all the crisis indicator LEDs
+          Turn on the crisis buzzer
+          Set ToggleOn to false
+        Else
+          Turn off all meteor LEDs
+          Turn off all crisis indicator LEDs
+          Turn off crisis buzzer
+          Set ToggleOn to true
+        End If
+        Decrement the counter by 1
+        If the counter is now 0
+          Turn off all meteor LEDs
+          Turn off all crisis indicator LEDs
+          Turn off crisis buzzer
+          Start a timer for OFF_DELAY
+        Else
+          Start a timer for LOSE_DELAY
+        End If
+      End If
+    Else If ThisEvent is of type Tot_Inserted
+      Turn off all meteor LEDs
+      Turn off all crisis indicator LEDs
+      Turn off crisis buzzer
+      Set CurrentState to Idle_E
+    End If
+  End If
+  Return ReturnEvent

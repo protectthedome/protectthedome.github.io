@@ -1,0 +1,127 @@
+/**********
+Pseudo code for the Cannon Library.
+This module reads the potentiometer, positions the cannon, vibrates the
+knob and lights up the tip LED on the cannon.
+This module uses the Servo library for positioning the cannon. this module
+uses the AD library to read the potentiometer.
+***********/
+
+Include headers
+Include Libraries needed (Servo.h, ADMulti.h)
+Define public functions prototypes
+  Cannon_HWInit
+  Cannon_LED
+  Cannon_Vibrate
+  Cannon_ReadButton
+  Cannon_GetPotValue
+  Cannon_UserPosition
+  Cannon_MoveToBank
+  Cannon_ManualPosition
+  QueryCannonPosition
+  QueryBankPositions
+
+Private Functions Prototypes
+  TrimCount
+  CalcPosition
+
+Define module variables
+  CannonPosition
+  BankPositions[3] equals position of {Left Bank, Middle Bank, Right Bank}
+
+Initialization function: Cannon_HWInit (no param)
+  set up port C by enabling the peripheral clock
+  Wait for the peripheral to be ready
+  Set PC6 (LED) and PC7 (Vibration) as digital outputs, PC5 (Button) as digital input
+	Enable Pull-up on PC5
+  Set LED and Vibration off
+  Setup the analog system to read one channel (PE4) (library function ADC_MultiInit(1))
+End function
+
+Function Cannon_LED (param: state)
+	If state is ON
+	  Set LED pin High
+	Else if state is OFF
+	 Set LED pin low
+	End if
+End Function
+
+Function Cannon_Vibrate (param: state)
+  If state is ON
+	 Set Vibration pin High
+	Else if state is OFF
+	 Set Vibration pin low
+	End if
+End Function
+
+Function Cannon_ReadButton (no param)
+	Read the button pin
+	Return pin value
+End Function
+
+Function Cannon_GetPotValue (no param)
+  Initialize array ADC_Results[1]
+	Read analog pins (library function ADC_MultiRead(ADC_Results))
+  Create variable count32 equals to ADC_Results[0]
+  Mask count32 and save it as uint16_t CountVal
+	Adjust the count value to match thresholds using TrimCount(CountVal)
+	Return the count
+End Function
+
+
+Function Cannon_UserPosition (param: ADCcount)
+  Convert ADC count to position using CalcPosition(ADCcount)
+	Call Servo_MoveCannon from library and give it the position, save boolean returned as Status
+	If Status is true
+	 update CannonPosition variable
+	End if
+	Return Status
+End function
+
+Function Cannon_MoveToBank (param: Bank)
+  If bank less than 3
+	 Get Bank position value from array BankPositions
+   Call Servo_MoveCannon with bank position, save boolean returned as Status
+	End If
+  If Status is true
+	 update CannonPosition variable
+	end if
+	Return Status
+End function
+
+Function Cannon_ManualPosition (param: position)
+  Call servo function Servo_MoveCannon with position as param, save boolean returned as Status
+  If Status is true
+	 update CannonPosition variable
+	End if
+	Return Status
+End function
+
+Function QueryCannonPosition (no param)
+	Return CannonPosition
+End Function
+
+Function QueryBankPositions (param: Bank)
+  if Bank greater than 2
+    PosValue equals 0xFF;
+  else
+    PosValue equals BankPositions[Bank]
+  Return PosValue
+End function
+
+Function: TrimCount (param: ADCount)
+  If value is above higher threshold
+   TrimmedValue equals upper threshold
+  Else If value is below lower threshold
+    TrimmedValue equals lower threshold
+  Else
+  	TrimmedValue equals ADCount
+  Return TrimmedValue
+End Function
+
+Function CalcPosition (param: ADCount)
+  countRange equals COUNT_UPPER_LIM - COUNT_LOWER_LIM
+	offset equals COUNT_LOWER_LIM (double)
+	ratio equals ((float)ADCount-offset)/(countRange);
+	ServoCount equals ratio*100;
+	return ServoCount
+End Function

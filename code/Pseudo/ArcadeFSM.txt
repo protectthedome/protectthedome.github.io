@@ -1,0 +1,78 @@
+//Pseudocode for ArcadeFSM.c
+
+InitArcadeFSM:
+
+Initialize Tot hardware
+Block Tot slot
+Turn all meteor LEDs off
+Initialize deferral queue
+Initialize airleak hardware
+Set current state to NotPlaying
+
+RunArcadeFSM:
+
+If CurrentSMState is NotPlaying
+	If Event is TotInserted
+		Turn all meteor LEDs off
+		Post LowPower event to PowerCrank_SM
+		Set CurrentSMState to Playing
+		Turn on buzzer
+		Initialize Timer
+
+else if CurrentSMState is Playing
+	If Event is RST or End_Of_Game
+		Release Tot
+		Initialize timer
+		Turn off buzzer
+		Set CurrentSMState to WaitForTotRelease
+	else if Event is ES_Timeout
+		Turn off buzzer
+	else if Event is Interaction_Completed
+		Turn off crisis LEDs
+		Initialize timer
+		Set CurrentSMState to WaitforNext
+	else if Event is Global_Time_Out
+		If power crank is idle
+			Post win event 
+		else
+			Post game over event
+		Initialize timer
+		Set CurrentSMState to WaitForTotRelease
+
+else if CurrentSMState is WaitForNext
+	If Event is ES_Timeout
+		Turn off buzzer
+		If all interactions have been completed
+			Post win event
+			Release Tot	
+			Initialize timer
+			Turn off buzzer
+			Set CurrentSMState to WaitForTotRelease
+		else if next interaction is a meteor
+			Post meteor event
+			Turn on meteor crisis LED
+			Set CurrentSMState to Playing
+		else if next interaction is a airleak
+			Post airleak event
+			Turn on airleak crisis LED
+			Turn on buzzer
+			Set CurrentSMState to Playing
+			Initialize timer
+	else if Event is RST or End_Of_Game
+		Turn buzzer off
+		Release Tot
+		Set CurrentSMState to WaitForTotRelease
+	else if Event is Global_Time_Out
+		If power crank is idle
+			Post win event 
+		else
+			Post game over event
+		Initialize timer
+		Turn off buzzer
+		Set CurrentSMState to WaitForTotRelease
+
+else if CurrentSMState is WaitForTotRelease
+	if Event is ES_Timeout
+		Block Tot slot
+		Set CurrentSMState to NotPlaying
+	

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>EndGameFSM.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   EndGameFSM.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   State machine for end of game behavior (both win and lose)</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl com">/*----------------------------- Include Files -----------------------------*/</span>
+<span class="hl com">/* include header files for this state machine as well as any machines at the</span>
+<span class="hl com">   next lower level in the hierarchy that are sub-machines to this machine</span>
+<span class="hl com">*/</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Configure.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ES_Framework.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;EndGameFSM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Tot.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Crisis.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Cannon.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;AirLeakLib.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Meteor.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;PowerLib.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ArcadeFSM.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;WelcomeFSM.h&quot;</span><span class="hl ppc"></span>
+
+
+
+
+<span class="hl com">/*----------------------------- Module Defines ----------------------------*/</span>
+<span class="hl ppc">#define WIN_DELAY 200</span>
+<span class="hl ppc">#define LOSE_DELAY 100</span>
+<span class="hl ppc">#define LED_MOD 5</span>
+<span class="hl ppc">#define MAX( a, b ) ( ( a &gt; b) ? a : b )</span> <span class="hl slc">// this might be poor practice...</span>
+<span class="hl ppc"></span><span class="hl ppc">#define OFF_DELAY 500</span>
+
+<span class="hl com">/*---------------------------- Module Functions ---------------------------*/</span>
+<span class="hl com">/* prototypes for private functions for this machine.They should be functions</span>
+<span class="hl com">   relevant to the behavior of this state machine</span>
+<span class="hl com">*/</span>
+
+<span class="hl com">/*---------------------------- Module Variables ---------------------------*/</span>
+<span class="hl slc">// everybody needs a state variable, you may need others as well.</span>
+<span class="hl slc">// type of state variable should match htat of enum in header file</span>
+<span class="hl kwb">static</span> EndGameState_t CurrentState<span class="hl opt">;</span>
+
+<span class="hl slc">// with the introductio n of Gen2, we need a module level Priority var as well</span>
+<span class="hl kwb">static uint8_t</span> MyPriority<span class="hl opt">;</span>
+
+<span class="hl slc">// counter for blinking LEDs (win) or number of steps (lose)</span>
+<span class="hl kwb">static uint16_t</span> counter<span class="hl opt">;</span>
+
+<span class="hl slc">// from 0-2, for cannon shooting fireworks</span>
+<span class="hl kwb">static uint8_t</span> position<span class="hl opt">;</span>
+
+<span class="hl slc">// keeps track of whether LEDs/buzzer are on or off</span>
+<span class="hl kwb">static bool</span> ToggleOn <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span>
+
+<span class="hl slc">// true if cannon pos &gt; 50, false if cannon pos &lt; 50</span>
+<span class="hl slc">// determines to which side the cannon falls</span>
+<span class="hl kwb">static bool</span> CannonDirection<span class="hl opt">;</span>
+
+<span class="hl com">/*------------------------------ Module Code ------------------------------*/</span>
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     InitEndGameFSM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     uint8_t : the priorty of this service</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     bool, false if error in initialization, true otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Saves away the priority, sets up the initial transition and does any</span>
+<span class="hl com">     other required initialization for this state machine</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"></span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">InitEndGameFSM</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Priority<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  ES_Event_t ThisEvent<span class="hl opt">;</span>
+
+  MyPriority <span class="hl opt">=</span> Priority<span class="hl opt">;</span>
+  <span class="hl slc">// put us into the Initial PseudoState</span>
+  CurrentState <span class="hl opt">=</span> InitPState_E<span class="hl opt">;</span>
+  <span class="hl slc">// post the initial transition event</span>
+  ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_INIT<span class="hl opt">;</span>
+  <span class="hl kwa">if</span> <span class="hl opt">(</span><span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span>MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">) ==</span> <span class="hl kwa">true</span><span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwa">return true</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+  <span class="hl kwa">else</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwa">return false</span><span class="hl opt">;</span>
+  <span class="hl opt">}</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">     PostEndGameFSM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">     EF_Event_t ThisEvent , the event to post to the queue</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">     boolean False if the Enqueue operation failed, True otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">     Posts an event to this state machine&#39;s queue</span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">PostEndGameFSM</span><span class="hl opt">(</span>ES_Event_t ThisEvent<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  <span class="hl kwa">return</span> <span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span>MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Function</span>
+<span class="hl com">    RunEndGameFSM</span>
+<span class="hl com"></span>
+<span class="hl com"> Parameters</span>
+<span class="hl com">   ES_Event_t : the event to process</span>
+<span class="hl com"></span>
+<span class="hl com"> Returns</span>
+<span class="hl com">   ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   add your description here</span>
+<span class="hl com"> Notes</span>
+<span class="hl com">   uses nested switch/case to implement the machine.</span>
+<span class="hl com"></span>
+<span class="hl com">****************************************************************************/</span>
+ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span>ES_Event_t ThisEvent<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+  ES_Event_t ReturnEvent<span class="hl opt">;</span>
+  ReturnEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_NO_EVENT<span class="hl opt">;</span> <span class="hl slc">// assume no errors</span>
+
+  <span class="hl kwa">switch</span> <span class="hl opt">(</span>CurrentState<span class="hl opt">)</span>
+  <span class="hl opt">{</span>
+    <span class="hl kwa">case</span> InitPState_E<span class="hl opt">:</span>        <span class="hl slc">// If current state is initial Psedudo State</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_INIT<span class="hl opt">)</span>    <span class="hl slc">// only respond to ES_Init</span>
+      <span class="hl opt">{</span>
+        <span class="hl slc">// now put the machine into the actual initial state</span>
+        CurrentState <span class="hl opt">=</span> Idle_E<span class="hl opt">;</span>
+      <span class="hl opt">}</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+
+    <span class="hl kwa">case</span> Idle_E<span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwa">switch</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType<span class="hl opt">)</span>
+      <span class="hl opt">{</span>
+        <span class="hl kwa">case</span> End_Of_Game<span class="hl opt">:</span>
+
+        <span class="hl opt">{</span>
+          <span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventParam <span class="hl opt">==</span> WIN<span class="hl opt">)</span>
+          <span class="hl opt">{</span>
+            <span class="hl slc">// Start timer</span>
+            <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> WIN_DELAY<span class="hl opt">);</span>
+            <span class="hl slc">// return TOT</span>
+            <span class="hl kwd">TOT_Release</span><span class="hl opt">();</span>
+            <span class="hl kwd">Crisis_Buzzer</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+            <span class="hl slc">// initialize counter to number of LEDs (8)</span>
+            counter <span class="hl opt">=</span> <span class="hl num">8</span><span class="hl opt">;</span>
+            <span class="hl slc">// initialize position to 0</span>
+            position <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+            <span class="hl slc">// move cannon to the first position</span>
+            <span class="hl kwd">Cannon_MoveToBank</span><span class="hl opt">(</span>position<span class="hl opt">);</span>
+            <span class="hl slc">// set current state to HappyDance</span>
+            CurrentState <span class="hl opt">=</span> HappyDance<span class="hl opt">;</span>
+            <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Going into win mode</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+          <span class="hl opt">}</span>
+          <span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventParam <span class="hl opt">==</span> GAME_OVER<span class="hl opt">)</span>
+          <span class="hl opt">{</span>
+            <span class="hl slc">// start timer</span>
+            <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> LOSE_DELAY<span class="hl opt">);</span>
+            <span class="hl slc">// return TOT</span>
+            <span class="hl kwd">TOT_Release</span><span class="hl opt">();</span>
+            <span class="hl kwd">Crisis_Buzzer</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+            <span class="hl slc">// determine how far from upright the cannon currently is</span>
+            <span class="hl kwb">int8_t</span> CannonPosFromUp<span class="hl opt">;</span>
+            CannonPosFromUp <span class="hl opt">= (</span><span class="hl num">50</span> <span class="hl opt">-</span> <span class="hl kwd">QueryCannonPosition</span><span class="hl opt">());</span>
+            <span class="hl slc">// decide which way cannon should fall</span>
+            <span class="hl kwa">if</span> <span class="hl opt">(</span>CannonPosFromUp <span class="hl opt">&gt;</span> <span class="hl num">0</span><span class="hl opt">)</span>
+            <span class="hl opt">{</span>
+              CannonDirection <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span> <span class="hl slc">// should fall to the right</span>
+            <span class="hl opt">}</span>
+            <span class="hl kwa">else</span>
+            <span class="hl opt">{</span>
+              CannonDirection <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span> <span class="hl slc">// should fall to the left</span>
+            <span class="hl opt">}</span>
+            <span class="hl slc">// set CannonPosFromUp to absolute value</span>
+            CannonPosFromUp <span class="hl opt">=</span> <span class="hl kwd">abs</span><span class="hl opt">(</span>CannonPosFromUp<span class="hl opt">);</span>
+            <span class="hl slc">// set counter = max of current gauge level or cannon position from upright</span>
+            counter <span class="hl opt">=</span> <span class="hl kwd">MAX</span><span class="hl opt">(</span><span class="hl kwd">MAX</span><span class="hl opt">(</span><span class="hl kwd">AirLeak_QueryGauge</span><span class="hl opt">(),</span> <span class="hl kwd">PowerLib_QueryGauge</span><span class="hl opt">()),</span> CannonPosFromUp<span class="hl opt">);</span>
+            <span class="hl slc">// set CurrentState to SadDance</span>
+            CurrentState <span class="hl opt">=</span> SadDance<span class="hl opt">;</span>
+            <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Going into sad mode</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+
+          <span class="hl opt">}</span>
+
+        <span class="hl opt">}</span>
+        <span class="hl kwa">break</span><span class="hl opt">;</span>
+        <span class="hl kwa">default</span><span class="hl opt">:</span>
+          <span class="hl opt">;</span>
+      <span class="hl opt">}</span>  <span class="hl slc">// end switch on CurrentEvent</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+
+    <span class="hl kwa">case</span> HappyDance<span class="hl opt">:</span>
+    <span class="hl opt">{</span>
+      <span class="hl kwa">switch</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType<span class="hl opt">)</span>
+      <span class="hl opt">{</span>
+        <span class="hl kwa">case</span> ES_TIMEOUT<span class="hl opt">:</span>
+
+        <span class="hl opt">{</span>
+          <span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">&gt;</span> <span class="hl num">0</span><span class="hl opt">)</span>
+          <span class="hl opt">{</span>
+            <span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">==</span> <span class="hl num">8</span><span class="hl opt">)</span>
+            <span class="hl opt">{</span>
+              <span class="hl slc">// light up cannon LED</span>
+              <span class="hl kwd">Cannon_LED</span><span class="hl opt">(</span>On<span class="hl opt">);</span>
+            <span class="hl opt">}</span>
+            <span class="hl kwa">else</span><span class="hl opt">{</span>
+              <span class="hl kwd">Cannon_LED</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+            <span class="hl opt">}</span>
+            <span class="hl slc">// move LED away from dome by 1</span>
+            <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>position<span class="hl opt">,</span> counter<span class="hl opt">);</span>
+            <span class="hl slc">// decrement counter by 1</span>
+            counter<span class="hl opt">--;</span>
+            <span class="hl slc">// init timer</span>
+            <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> WIN_DELAY<span class="hl opt">);</span>
+          <span class="hl opt">}</span>
+          <span class="hl kwa">else if</span> <span class="hl opt">( (</span>counter <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl opt">) &amp;&amp; (</span>position <span class="hl opt">&lt;</span> <span class="hl num">3</span><span class="hl opt">) )</span>
+          <span class="hl opt">{</span>
+            <span class="hl slc">// increment position</span>
+            position <span class="hl opt">=</span> position <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">;</span>
+            <span class="hl slc">// move cannon to next position</span>
+            <span class="hl kwd">Cannon_MoveToBank</span><span class="hl opt">(</span>position<span class="hl opt">);</span>
+            <span class="hl slc">// reset counter</span>
+            counter <span class="hl opt">=</span> <span class="hl num">8</span><span class="hl opt">;</span>
+            <span class="hl kwa">if</span> <span class="hl opt">(</span>position <span class="hl opt">==</span> <span class="hl num">3</span><span class="hl opt">)</span>
+            <span class="hl opt">{</span>
+                <span class="hl slc">// turn off all LEDs</span>
+                <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+                <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+                <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+                <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+                <span class="hl slc">// wait a hot sec</span>
+                <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> OFF_DELAY<span class="hl opt">);</span> <span class="hl slc">//I changed off_delay to zero for testing. It possibly may be interfering with existing timer?</span>
+            <span class="hl opt">}</span>
+            <span class="hl kwa">else</span> 
+            <span class="hl opt">{</span>
+                <span class="hl slc">// init timer</span>
+                <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> WIN_DELAY<span class="hl opt">);</span>
+            <span class="hl opt">}</span>
+          <span class="hl opt">}</span>
+          <span class="hl kwa">else if</span> <span class="hl opt">(</span>position <span class="hl opt">==</span> <span class="hl num">3</span><span class="hl opt">)</span>
+          <span class="hl opt">{</span>
+            <span class="hl slc">// post Go_Welcome_Mode to WelcomeFSM</span>
+            ES_Event_t NextEvent<span class="hl opt">;</span>
+            NextEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Go_Welcome_Mode<span class="hl opt">;</span>
+            <span class="hl kwd">PostWelcomeFSM</span><span class="hl opt">(</span>NextEvent<span class="hl opt">);</span>
+            <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Going into welcome mode</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+            <span class="hl slc">// set CurrentState to Idle_E</span>
+            CurrentState <span class="hl opt">=</span> Idle_E<span class="hl opt">;</span>
+          <span class="hl opt">}</span>
+        <span class="hl opt">}</span>
+        <span class="hl kwa">break</span><span class="hl opt">;</span>
+        <span class="hl kwa">case</span> Tot_Inserted<span class="hl opt">:</span>
+        <span class="hl opt">{</span>
+          <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+          <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          CurrentState <span class="hl opt">=</span> Idle_E<span class="hl opt">;</span>
+
+        <span class="hl opt">}</span>
+        <span class="hl kwa">break</span><span class="hl opt">;</span>
+        <span class="hl kwa">default</span><span class="hl opt">:</span>
+          <span class="hl opt">;</span>
+      <span class="hl opt">}</span>  <span class="hl slc">// end switch on CurrentEvent</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+
+    <span class="hl kwa">case</span> SadDance<span class="hl opt">:</span>
+    <span class="hl opt">{</span>      
+      <span class="hl kwa">switch</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType<span class="hl opt">)</span>
+      <span class="hl opt">{</span>
+        <span class="hl kwa">case</span> ES_TIMEOUT<span class="hl opt">:</span>
+        <span class="hl opt">{</span>
+          <span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl opt">)</span>
+          <span class="hl opt">{</span>
+            <span class="hl slc">// post Go_Welcome_Mode to WelcomeFSM</span>
+            ES_Event_t NextEvent<span class="hl opt">;</span>
+            NextEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Go_Welcome_Mode<span class="hl opt">;</span>
+            <span class="hl kwd">PostWelcomeFSM</span><span class="hl opt">(</span>NextEvent<span class="hl opt">);</span>
+            <span class="hl slc">// set CurrentState to Idle_E</span>
+            CurrentState <span class="hl opt">=</span> Idle_E<span class="hl opt">;</span>
+            <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Going into welcome mode</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+
+          <span class="hl opt">}</span>
+          <span class="hl kwa">else if</span> <span class="hl opt">(</span>counter <span class="hl opt">&gt;</span> <span class="hl num">0</span><span class="hl opt">)</span>
+          <span class="hl opt">{</span>
+            <span class="hl slc">// move cannon down</span>
+            <span class="hl kwb">uint16_t</span> NewCannonPos <span class="hl opt">=</span> <span class="hl kwd">QueryCannonPosition</span><span class="hl opt">();</span>
+            <span class="hl kwa">if</span> <span class="hl opt">(</span>CannonDirection <span class="hl opt">==</span> <span class="hl kwa">true</span><span class="hl opt">)</span>
+            <span class="hl opt">{</span>
+              NewCannonPos <span class="hl opt">=</span> NewCannonPos <span class="hl opt">-</span> <span class="hl num">1</span><span class="hl opt">;</span>
+              <span class="hl kwd">Cannon_ManualPosition</span><span class="hl opt">(</span>NewCannonPos<span class="hl opt">);</span>
+            <span class="hl opt">}</span>
+            <span class="hl kwa">else</span>
+            <span class="hl opt">{</span>
+              NewCannonPos <span class="hl opt">=</span> NewCannonPos <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">;</span>
+              <span class="hl kwd">Cannon_ManualPosition</span><span class="hl opt">(</span>NewCannonPos<span class="hl opt">);</span>
+            <span class="hl opt">}</span>
+            <span class="hl slc">// move gauges down</span>
+            <span class="hl kwd">AirLeak_MoveGauge</span><span class="hl opt">(</span><span class="hl kwd">AirLeak_QueryGauge</span><span class="hl opt">() -</span> <span class="hl num">1</span><span class="hl opt">);</span>
+            <span class="hl kwd">PowerLib_MoveGauge</span><span class="hl opt">(</span><span class="hl kwd">PowerLib_QueryGauge</span><span class="hl opt">() -</span> <span class="hl num">1</span><span class="hl opt">);</span> 
+
+            <span class="hl kwa">if</span> <span class="hl opt">(</span>ToggleOn<span class="hl opt">)</span>
+            <span class="hl opt">{</span>
+              <span class="hl slc">// toggle LEDs touching the dome</span>
+              <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">,</span> <span class="hl num">8</span><span class="hl opt">);</span>
+              <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">1</span><span class="hl opt">,</span> <span class="hl num">8</span><span class="hl opt">);</span>
+              <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">2</span><span class="hl opt">,</span> <span class="hl num">8</span><span class="hl opt">);</span>
+              <span class="hl slc">// toggle indicator lights</span>
+              <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>On<span class="hl opt">);</span>
+              <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>On<span class="hl opt">);</span>
+              <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>On<span class="hl opt">);</span>
+              <span class="hl slc">// toggle buzzer</span>
+              <span class="hl slc">//Crisis_Buzzer(On);</span>
+              <span class="hl slc">// switch ToggleOn to False</span>
+              ToggleOn <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
+            <span class="hl opt">}</span>
+            <span class="hl kwa">else</span>
+            <span class="hl opt">{</span>
+              <span class="hl slc">// toggle LEDs touching the dome</span>
+              <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+              <span class="hl slc">// toggle indicator lights</span>
+              <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+              <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+              <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+              <span class="hl slc">// toggle buzzer</span>
+              <span class="hl slc">//Crisis_Buzzer(Off);</span>
+              <span class="hl slc">// switch ToggleOn to True</span>
+              ToggleOn <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span>
+            <span class="hl opt">}</span>
+            <span class="hl slc">// decrement counter</span>
+            counter <span class="hl opt">=</span> counter <span class="hl opt">-</span> <span class="hl num">1</span><span class="hl opt">;</span>
+            <span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl opt">)</span>
+            <span class="hl opt">{</span>
+                <span class="hl slc">// turn off all LEDs</span>
+                <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+                <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+                <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+                <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+                <span class="hl slc">// wait a hot sec</span>
+                <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> OFF_DELAY<span class="hl opt">);</span>
+            <span class="hl opt">}</span>
+            <span class="hl kwa">else</span> 
+            <span class="hl opt">{</span>
+                <span class="hl slc">// init timer</span>
+                <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> LOSE_DELAY<span class="hl opt">);</span>
+            <span class="hl opt">}</span>
+          <span class="hl opt">}</span>
+        <span class="hl opt">}</span>
+        <span class="hl kwa">break</span><span class="hl opt">;</span>
+        <span class="hl kwa">case</span> Tot_Inserted<span class="hl opt">:</span>
+        <span class="hl opt">{</span>
+          <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
+          <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
+          CurrentState <span class="hl opt">=</span> Idle_E<span class="hl opt">;</span>
+        <span class="hl opt">}</span>
+        <span class="hl kwa">break</span><span class="hl opt">;</span>
+        <span class="hl kwa">default</span><span class="hl opt">:</span>
+          <span class="hl opt">;</span>
+      <span class="hl opt">}</span>  <span class="hl slc">// end switch on CurrentEvent</span>
+    <span class="hl opt">}</span>
+    <span class="hl kwa">break</span><span class="hl opt">;</span>
+
+    <span class="hl kwa">default</span><span class="hl opt">:</span>
+      <span class="hl opt">;</span>
+  <span class="hl opt">}</span>                                   <span class="hl slc">// end switch on Current State</span>
+  <span class="hl kwa">return</span> ReturnEvent<span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/***************************************************************************</span>
+<span class="hl com"> private functions</span>
+<span class="hl com"> ***************************************************************************/</span>
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>TOT.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   TOT.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This module looks for the TOT on insertion and controls the release of it</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> History</span>
+<span class="hl com"> When           Who     What/Why</span>
+<span class="hl com"> -------------- ---     --------</span>
+<span class="hl com"> 11/9/19 14:10 ram     initial release</span>
+<span class="hl com"> </span>
+<span class="hl com">****************************************************************************/</span>
+
+<span class="hl slc">// the common headers for C99 types </span>
+<span class="hl ppc">#include &lt;stdint.h&gt;</span>
+<span class="hl ppc">#include &lt;stdbool.h&gt;</span>
+
+<span class="hl slc">// the headers to access the GPIO subsystem</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">// the headers to access the TivaWare Library</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/sysctl.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/pin_map.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/timer.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/interrupt.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;termio.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;BITDEFS.H&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">//Libraries</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;TOT.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;Servo.h&quot;</span><span class="hl ppc"></span>
+
+
+<span class="hl slc">//defintitions</span>
+<span class="hl ppc">#define ALL_BITS (0xff&lt;&lt;2) </span>
+<span class="hl ppc">#define IR_PORT HWREG(GPIO_PORTD_BASE+(GPIO_O_DATA+ALL_BITS))</span>
+
+<span class="hl ppc">#define IR_PIN BIT0HI</span>
+
+<span class="hl ppc">#define OPEN_POS 43</span>
+<span class="hl ppc">#define CLOSED_POS 0</span>
+
+<span class="hl com">/***Public Functions***/</span>
+<span class="hl kwb">void</span> <span class="hl kwd">TOT_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">TOT_Detect</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">TOT_Release</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">TOT_Block</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+
+<span class="hl kwb">void</span> <span class="hl kwd">TOT_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//turn on portD</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>SYSCTL_RCGCGPIO<span class="hl opt">) |=</span> SYSCTL_RCGCGPIO_R3<span class="hl opt">;</span>
+	<span class="hl kwa">while</span><span class="hl opt">((</span><span class="hl kwd">HWREG</span><span class="hl opt">(</span>SYSCTL_PRGPIO<span class="hl opt">)&amp;</span>SYSCTL_PRGPIO_R3<span class="hl opt">) !=</span> SYSCTL_PRGPIO_R3<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Set PD0 as digital input</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTD_BASE<span class="hl opt">+</span>GPIO_O_DEN<span class="hl opt">) |=</span> BIT0HI<span class="hl opt">;</span>
+	<span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTD_BASE<span class="hl opt">+</span>GPIO_O_DIR<span class="hl opt">) &amp;=</span> BIT0LO<span class="hl opt">;</span>
+  
+  <span class="hl slc">//Enable Pull-up on PD0</span>
+  <span class="hl kwd">HWREG</span><span class="hl opt">(</span>GPIO_PORTD_BASE<span class="hl opt">+</span>GPIO_O_PUR<span class="hl opt">) |=</span> BIT0HI<span class="hl opt">;</span>
+	<span class="hl kwa">return</span><span class="hl opt">;</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">TOT_Detect</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Get PORTD value</span>
+	<span class="hl kwb">uint8_t</span> PortVal<span class="hl opt">;</span>
+	PortVal <span class="hl opt">=</span> IR_PORT<span class="hl opt">;</span>
+	<span class="hl slc">//Return value at bit0</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>PortVal <span class="hl opt">&amp;</span> IR_PIN<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">TOT_Release</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//call TOTmove servo with needed tick count to open gate</span>
+	<span class="hl kwb">bool</span> status<span class="hl opt">;</span>
+	status <span class="hl opt">=</span> <span class="hl kwd">Servo_MoveTOT</span><span class="hl opt">(</span>OPEN_POS<span class="hl opt">);</span>
+	<span class="hl slc">//return status of PWM</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>status<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">TOT_Block</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//call TOTmove servo with needed tick count to close gate</span>
+	<span class="hl kwb">bool</span> status<span class="hl opt">;</span>
+	status <span class="hl opt">=</span> <span class="hl kwd">Servo_MoveTOT</span><span class="hl opt">(</span>CLOSED_POS<span class="hl opt">);</span>
+	<span class="hl slc">//return status of PWM</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>status<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

@@ -1,0 +1,34 @@
+/**********
+Pseudo code for the TOT Library.
+This module looks for the TOT on insertion and controls the release of it
+***********/
+
+Include headers
+Include Libraries needed (Servo.h)
+Define public functions prototypes
+  TOT_HWInit
+  TOT_Detect
+  TOT_Release
+  TOT_Block
+
+
+Initialization Function: TOT_HWInit (no param)
+	Turn on portD
+	Set PD0 as digital input
+	Enable Pull-up on PD0
+End function
+
+Function TOT_Detect (no param)
+	Get PORTD value
+	Return value at bit0
+End Function
+
+Function TOT_Release (no param)
+  Call Servo function Servo_MoveTOT to open, save boolean returned as Status
+  Return Status
+End function
+
+Function TOT_Block(no param)
+  Call Servo function Servo_MoveTOT to close, save boolean returned as Status
+	Return Status
+End Function

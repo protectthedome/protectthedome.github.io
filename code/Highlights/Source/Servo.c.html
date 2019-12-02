@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Servo.c</title>
+<link rel="stylesheet" type="text/css" href="highlight.css">
+</head>
+<body class="hl">
+<pre class="hl"><span class="hl com">/****************************************************************************</span>
+<span class="hl com"> Module</span>
+<span class="hl com">   ServoModule.c</span>
+<span class="hl com"></span>
+<span class="hl com"> Revision</span>
+<span class="hl com">   1.0.1</span>
+<span class="hl com"></span>
+<span class="hl com"> Description</span>
+<span class="hl com">   This module acts as the low level interface to move the servo motors using</span>
+<span class="hl com">   PWM functions</span>
+<span class="hl com"></span>
+<span class="hl com"> Notes</span>
+<span class="hl com"></span>
+<span class="hl com"> History</span>
+<span class="hl com"> When           Who     What/Why</span>
+<span class="hl com"> -------------- ---     --------</span>
+<span class="hl com"> 11/7/19 8:03 ram     initial release</span>
+<span class="hl com"></span>
+<span class="hl com">****************************************************************************/</span>
+<span class="hl slc">// the common headers for C99 types</span>
+<span class="hl ppc">#include &lt;stdint.h&gt;</span>
+<span class="hl ppc">#include &lt;stdbool.h&gt;</span>
+
+<span class="hl slc">// the headers to access the GPIO subsystem</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_types.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_sysctl.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">// the headers to access the TivaWare Library</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/sysctl.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/pin_map.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/gpio.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/timer.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;driverlib/interrupt.h&quot;</span><span class="hl ppc"></span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;termio.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">//include PWM module</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;PWM16Tiva.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl slc">// For redability</span>
+<span class="hl ppc">#include</span> <span class="hl pps">&quot;ServoDefs.h&quot;</span><span class="hl ppc"></span>
+
+<span class="hl com">/***Private Functions***/</span>
+<span class="hl kwb">static uint16_t</span> <span class="hl kwd">Count2Ticks</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">,</span> <span class="hl kwb">uint16_t</span> HiLimit<span class="hl opt">,</span> <span class="hl kwb">uint16_t</span> LoLimit<span class="hl opt">);</span>
+<span class="hl kwb">static uint16_t</span> <span class="hl kwd">Period2Tick</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Period_ms<span class="hl opt">);</span>
+
+<span class="hl com">/***Public Functions***/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_MoveCannon</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_MoveO2Gauge</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_MoveTOT</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_MoveTimer</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">);</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_MovePowerGauge</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">);</span>
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">QueryServoPosition</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Which<span class="hl opt">);</span>
+
+<span class="hl com">/***Module Variables***/</span>
+<span class="hl kwb">uint8_t</span> ServoPositions<span class="hl opt">[</span><span class="hl num">5</span><span class="hl opt">];</span> <span class="hl slc">// each element for each servo</span>
+
+<span class="hl com">/***</span>
+<span class="hl com">Servo_HWInit Function Description</span>
+<span class="hl com">	Arguements: None</span>
+<span class="hl com">	Return: PWM Status</span>
+<span class="hl com">	Following function intializes the needed number of PWM channels and sets</span>
+<span class="hl com">	the needed period for each group. To define the period, update the value</span>
+<span class="hl com">	in ServoDefs.h. Period values are in ms</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">// Intialize the channels</span>
+	<span class="hl kwb">bool</span> InitStatus <span class="hl opt">=</span> <span class="hl kwd">PWM_TIVA_Init</span><span class="hl opt">(</span>NUM_SERVOS<span class="hl opt">);</span>
+
+	<span class="hl slc">// Set period for the cannon and timer servo</span>
+	<span class="hl kwb">uint16_t</span> Group0Period <span class="hl opt">=</span> <span class="hl kwd">Period2Tick</span><span class="hl opt">(</span>CANNON_TIMER_PERIOD_MS<span class="hl opt">);</span>
+	InitStatus <span class="hl opt">&amp;=</span> <span class="hl kwd">PWM_TIVA_SetPeriod</span><span class="hl opt">(</span>Group0Period<span class="hl opt">,</span>CANNON_TIMER_GROUP<span class="hl opt">);</span>
+
+	<span class="hl slc">// Set period for gauge servos</span>
+	<span class="hl kwb">uint16_t</span> Group1Period <span class="hl opt">=</span> <span class="hl kwd">Period2Tick</span><span class="hl opt">(</span>GAUGE_GROUP_PERIOD_MS<span class="hl opt">);</span>
+	InitStatus <span class="hl opt">&amp;=</span> <span class="hl kwd">PWM_TIVA_SetPeriod</span><span class="hl opt">(</span>Group1Period<span class="hl opt">,</span> GAUGE_GROUP<span class="hl opt">);</span>
+
+	<span class="hl slc">// Set period for TOT servo</span>
+	<span class="hl kwb">uint16_t</span> Group2Period <span class="hl opt">=</span> <span class="hl kwd">Period2Tick</span><span class="hl opt">(</span>TOT_GROUP_PERIOD_MS<span class="hl opt">);</span>
+	InitStatus <span class="hl opt">&amp;=</span> <span class="hl kwd">PWM_TIVA_SetPeriod</span><span class="hl opt">(</span>Group2Period<span class="hl opt">,</span> TOT_GROUP<span class="hl opt">);</span>
+
+	<span class="hl slc">// Return state of intialization</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>InitStatus<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+<span class="hl com">/*** Servo_Move[Name] Function Description</span>
+<span class="hl com">	Argument: ServoCount</span>
+<span class="hl com">		Note: Enter a vlue between 0-100. If a value outside this range is</span>
+<span class="hl com">		entered, the function will return false without executing anything.</span>
+<span class="hl com">	Return: PWM Status</span>
+<span class="hl com">	The following functions all behave the same way. They take a count value,</span>
+<span class="hl com">	which reperesents the percentage of motion you want to move them between</span>
+<span class="hl com">	the servo&#39;s defined max and min positions (defined in ServoDefs).</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_MoveCannon</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">){</span>
+	<span class="hl slc">// Check input range</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>ServoCount <span class="hl opt">&gt;</span> <span class="hl num">100</span><span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl kwa">return false</span><span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Convert ServoCount to Ticks</span>
+	<span class="hl kwb">uint16_t</span> TickCount<span class="hl opt">;</span>
+	TickCount <span class="hl opt">=</span> <span class="hl kwd">Count2Ticks</span><span class="hl opt">(</span>ServoCount<span class="hl opt">,</span> CANNON_HI_LIM<span class="hl opt">,</span> CANNON_LO_LIM<span class="hl opt">);</span>
+
+	<span class="hl slc">// Set pulse width on cannon PWM channel</span>
+	<span class="hl kwb">bool</span> status<span class="hl opt">;</span>
+	status <span class="hl opt">=</span> <span class="hl kwd">PWM_TIVA_SetPulseWidth</span><span class="hl opt">(</span>TickCount<span class="hl opt">,</span> CANNON_SERVO<span class="hl opt">);</span>
+
+	<span class="hl slc">// Update position value if motion successful</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>status<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		ServoPositions<span class="hl opt">[</span>CANNON_SERVO<span class="hl opt">] =</span> ServoCount<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Retun status</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>status<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_MoveTimer</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">){</span>
+	<span class="hl slc">// Check input range</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>ServoCount <span class="hl opt">&gt;</span> <span class="hl num">100</span><span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl kwa">return false</span><span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Convert ServoCount to Ticks</span>
+	<span class="hl kwb">uint16_t</span> TickCount<span class="hl opt">;</span>
+	TickCount <span class="hl opt">=</span> <span class="hl kwd">Count2Ticks</span><span class="hl opt">(</span>ServoCount<span class="hl opt">,</span> TIMER_HI_LIM<span class="hl opt">,</span> TIMER_LO_LIM<span class="hl opt">);</span>
+
+	<span class="hl slc">// Set pulse width on TIMER_SERVO PWM channel</span>
+	<span class="hl kwb">bool</span> status<span class="hl opt">;</span>
+	status <span class="hl opt">=</span> <span class="hl kwd">PWM_TIVA_SetPulseWidth</span><span class="hl opt">(</span>TickCount<span class="hl opt">,</span> TIMER_SERVO<span class="hl opt">);</span>
+
+	<span class="hl slc">// Update position value if motion successful</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>status<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		ServoPositions<span class="hl opt">[</span>TIMER_SERVO<span class="hl opt">] =</span> ServoCount<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Retun status</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>status<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_MoveO2Gauge</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">){</span>
+	<span class="hl slc">// Check input range</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>ServoCount <span class="hl opt">&gt;</span> <span class="hl num">100</span><span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl kwa">return false</span><span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Convert ServoCount to Ticks</span>
+	<span class="hl kwb">uint16_t</span> TickCount<span class="hl opt">;</span>
+	TickCount <span class="hl opt">=</span> <span class="hl kwd">Count2Ticks</span><span class="hl opt">(</span>ServoCount<span class="hl opt">,</span> O2_GAUGE_HI_LIM<span class="hl opt">,</span> O2_GAUGE_LO_LIM<span class="hl opt">);</span>
+	<span class="hl slc">// Set pulse width on O2_GAUGE_SERVO PWM channel</span>
+	<span class="hl kwb">bool</span> status<span class="hl opt">;</span>
+	status <span class="hl opt">=</span> <span class="hl kwd">PWM_TIVA_SetPulseWidth</span><span class="hl opt">(</span>TickCount<span class="hl opt">,</span> O2_GAUGE_SERVO<span class="hl opt">);</span>
+
+	<span class="hl slc">// Update position value if motion successful</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>status<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		ServoPositions<span class="hl opt">[</span>O2_GAUGE_SERVO<span class="hl opt">] =</span> ServoCount<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Retun status</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>status<span class="hl opt">);</span>
+
+<span class="hl opt">}</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_MovePowerGauge</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">){</span>
+	<span class="hl slc">// Check input range</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>ServoCount <span class="hl opt">&gt;</span> <span class="hl num">100</span><span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl kwa">return false</span><span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Convert ServoCount to Ticks</span>
+	<span class="hl kwb">uint16_t</span> TickCount<span class="hl opt">;</span>
+	TickCount <span class="hl opt">=</span> <span class="hl kwd">Count2Ticks</span><span class="hl opt">(</span>ServoCount<span class="hl opt">,</span> POWER_GAUGE_HI_LIM<span class="hl opt">,</span> POWER_GAUGE_LO_LIM<span class="hl opt">);</span>
+
+	<span class="hl slc">// Set pulse width on cannon PWM channel</span>
+	<span class="hl kwb">bool</span> status<span class="hl opt">;</span>
+	status <span class="hl opt">=</span> <span class="hl kwd">PWM_TIVA_SetPulseWidth</span><span class="hl opt">(</span>TickCount<span class="hl opt">,</span> POWER_GAUGE_SERVO<span class="hl opt">);</span>
+
+	<span class="hl slc">// Update position value if motion successful</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>status<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		ServoPositions<span class="hl opt">[</span>POWER_GAUGE_SERVO<span class="hl opt">] =</span> ServoCount<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Retun status</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>status<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">bool</span> <span class="hl kwd">Servo_MoveTOT</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">){</span>
+	<span class="hl slc">// Check input range</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>ServoCount <span class="hl opt">&gt;</span> <span class="hl num">100</span><span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl kwa">return false</span><span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Convert ServoCount to Ticks</span>
+	<span class="hl kwb">uint16_t</span> TickCount<span class="hl opt">;</span>
+	TickCount <span class="hl opt">=</span> <span class="hl kwd">Count2Ticks</span><span class="hl opt">(</span>ServoCount<span class="hl opt">,</span> TOT_HI_LIM<span class="hl opt">,</span> TOT_LO_LIM<span class="hl opt">);</span>
+
+	<span class="hl slc">// Set pulse width on cannon PWM channel</span>
+	<span class="hl kwb">bool</span> status<span class="hl opt">;</span>
+	status <span class="hl opt">=</span> <span class="hl kwd">PWM_TIVA_SetPulseWidth</span><span class="hl opt">(</span>TickCount<span class="hl opt">,</span> TOT_SERVO<span class="hl opt">);</span>
+
+	<span class="hl slc">// Update position value if motion successful</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>status<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		ServoPositions<span class="hl opt">[</span>TOT_SERVO<span class="hl opt">] =</span> ServoCount<span class="hl opt">;</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">// Retun status</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>status<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl com">/*** QueryServoPosition Function Description</span>
+<span class="hl com">	Arguement: Which servo</span>
+<span class="hl com">	Returns: Current count</span>
+<span class="hl com">	This function returns what the last count value that was written to the</span>
+<span class="hl com">	servo. It does not give you a tick value!</span>
+<span class="hl com">***/</span>
+<span class="hl kwb">uint8_t</span> <span class="hl kwd">QueryServoPosition</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Which<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Create holder, set to 0xFF by defualt</span>
+	<span class="hl kwb">uint8_t</span> CurrentPosition<span class="hl opt">;</span>
+	CurrentPosition <span class="hl opt">=</span> <span class="hl num">0xFF</span><span class="hl opt">;</span>
+	<span class="hl slc">//If Which &lt; NUM_SERVOS</span>
+	<span class="hl kwa">if</span><span class="hl opt">(</span>Which <span class="hl opt">&lt;</span> NUM_SERVOS<span class="hl opt">)</span>
+	<span class="hl opt">{</span>
+		<span class="hl slc">//Get needed element</span>
+		CurrentPosition <span class="hl opt">=</span> ServoPositions<span class="hl opt">[</span>Which<span class="hl opt">];</span>
+	<span class="hl slc">//End if</span>
+	<span class="hl opt">}</span>
+	<span class="hl slc">//Return position value</span>
+	<span class="hl kwa">return</span> <span class="hl opt">(</span>CurrentPosition<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+<span class="hl com">/******************************************************************************/</span>
+
+<span class="hl kwb">static uint16_t</span> <span class="hl kwd">Count2Ticks</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> ServoCount<span class="hl opt">,</span> <span class="hl kwb">uint16_t</span> HiLimit<span class="hl opt">,</span> <span class="hl kwb">uint16_t</span> LoLimit<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Intialize variables</span>
+	<span class="hl kwb">uint16_t</span> TickRange<span class="hl opt">,</span> TickCount<span class="hl opt">;</span>
+	<span class="hl slc">// Determine the tick range of the servo</span>
+	TickRange <span class="hl opt">=</span> HiLimit <span class="hl opt">-</span> LoLimit<span class="hl opt">;</span>
+	<span class="hl slc">// Get ther pecentage of the tick range</span>
+	<span class="hl kwb">double</span> ratio <span class="hl opt">= (</span><span class="hl kwb">double</span><span class="hl opt">)</span>ServoCount<span class="hl opt">/</span><span class="hl num">100.0</span><span class="hl opt">;</span>
+	<span class="hl slc">//TickAddition = ;</span>
+	<span class="hl slc">// Perform y=mx+b, m = range, x=ration, b = lolimit</span>
+	TickCount <span class="hl opt">=</span> ratio<span class="hl opt">*</span>TickRange<span class="hl opt">+</span>LoLimit<span class="hl opt">;</span>
+  <span class="hl slc">//printf(&quot;\rPosition ticks %u\r\n&quot;, TickCount);</span>
+	<span class="hl kwa">return</span> <span class="hl opt">(</span>TickCount<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+
+<span class="hl kwb">static uint16_t</span> <span class="hl kwd">Period2Tick</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Period_ms<span class="hl opt">)</span>
+<span class="hl opt">{</span>
+	<span class="hl slc">//Convert to us</span>
+	<span class="hl kwb">uint16_t</span> Period_us <span class="hl opt">=</span> Period_ms<span class="hl opt">*</span><span class="hl num">1000</span><span class="hl opt">;</span>
+	<span class="hl slc">//Multiply by TICK_US (float math)</span>
+	<span class="hl kwb">uint16_t</span> TickCount<span class="hl opt">;</span>
+	TickCount <span class="hl opt">= ((</span><span class="hl kwb">double</span><span class="hl opt">)</span>Period_us<span class="hl opt">)/</span>TICK_US<span class="hl opt">;</span>
+	<span class="hl slc">//return tick value</span>
+	<span class="hl kwa">return</span><span class="hl opt">(</span>TickCount<span class="hl opt">);</span>
+<span class="hl opt">}</span>
+<span class="hl slc">//----------------------------End of File-----------------------------------//</span>
+</pre>
+</body>
+</html>
+<!--HTML generated by highlight 3.53, http://www.andre-simon.de/-->

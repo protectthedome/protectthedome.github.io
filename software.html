@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Protect the Dome- Software Design</title>
+    <!-- Bootstrap -->
+    <link href="css/bootstrap-4.3.1.css" rel="stylesheet">
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
+          <li class="nav-item ">
+            <a class="nav-link" href="index.html">Home <span class="sr-only">(current)</span></a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="mechanical.html">Mechanical</a>
+          </li>
+			<li class="nav-item">
+            <a class="nav-link" href="electrical.html">Electrical</a>
+          </li>
+						<li class="nav-item">
+            <a class="nav-link active" href="software.html">Software</a>
+          </li>
+			<li class="nav-item">
+            <a class="nav-link" href="bom.html">Bill of Materials</a>
+          </li>
+			<li class="nav-item">
+            <a class="nav-link" href="gems.html">Gems of Wisdom</a>
+          </li>          
+        </ul>
+        <form class="form-inline my-2 my-lg-0">
+        </form>
+      </div>
+    </nav>
+    <section>
+      
+        <div class="container-fluid">
+
+				<img src="images/banner.png"   class="img-fluid"  width: 100% \9>
+
+        </div>
+      
+  </section>
+    <section>
+      <div class="container">
+        <div class="row">
+          <div class="col-12 text-center">
+            </br></br>
+			  <h1>Software design</h1>
+          </div>
+		<ol type="1">
+			<li><a href="#game_flow">Game Flow</a></li>
+			<li><a href="#state_diagrams">State Diagrams</a></li>
+			<li><a href="#code">Code and pseudocode listing</a></li>
+		</ol> 
+        </div>
+      </div>
+    </section>
+
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1 " id="game_flow">Game Flow</h4>
+					
+			  
+			  </div>
+		</div>
+        <div class="row">
+          <div class="col-3">          
+		    <img src="images/cabinet.png" style="width:100%">
+		  </div>
+			
+			 <div class="col-9">
+            <ul class="list-unstyled">
+
+         
+                  <ol type="1">
+			<li>To start the game, the user inserts the TOT (stainless steel washer that serves as a token) on the left side of the cabinet.</li>
+			<li>The rocket on the top of the cabinet starts moving; it signals the passage of time. It reaches the right side after 60s.</li>
+			<li>The first interaction is to <strong>Power the Dome:</strong></li>
+				  <ol type="1">
+					<li>The warning LED corresponding to "Power the Dome" game will illuminate.</li>  
+					  <li>The user turns the crank. This generates a voltage from a DC motor.</li>
+					  <li>While the user is turning the crank, the power gauge level will increase.</li>
+					  <li>When the power level reaches 100%, the interaction finishes, and the warning LED will go off.</li>
+					  </ol>
+	
+			<li>During the rest of the game, the user will encounter 2 possible games: "Shoot Down Meteorites", or "Plug Air Leaks". The active game will be indicated by the warning LED.</li> 
+			<strong>Shoot Down Meteorites:</strong>
+			<ol type="1">
+			<li>The warning LED corresponding to "Shoot Down Meteorites" game will light.</li>
+			<li>On the back panel, the first LED of one of the 3 meteorites bank will turn on. The meteorite will move downwards, closer to the dome.</li>
+			<li>If the meteorite reaches the dome, the user loses the game.</li>
+			<li>To shoot down the meteorite the user needs to move the cannon, pointing it towards the meteorite and then press the blue button to fire the cannon.</li>
+			<li>When the user presses the blue button, a blue LED on the cannon tip will light. If the meteorite is in range the meteorite will disappear, the nob will vibrate, and the warning LED will go off.</li>
+			</ol>
+			<strong>Air Leaks:</strong>
+			<ol type="1">
+			<li>The warning LED corresponding to "Air Leak" game will light. The buzzer will also sound at the beginning of the game.</li>
+			<li>One of the 3 possible fans will turn on.</li>
+			<li>The oxygen gauge level will start decreasing. If this level reaches zero, the user loses the game.</li>
+			<li>The user must search from where is the air coming from. When they find it, they must insert the plug in the air leak hole. This event will be detected via hall sensors in the inside the hole, and a magnet in the plug.</li>
+			<li>When an air leak is plugged, the fan and the warning LED will go off.</li>
+			</ol>
+		<li>The user will win the game if they survive 60s or complete a fixed number of interactions. When the user wins the game, they enter to the "Happy Dance" mode. During the "Happy Dance" the cannon moves to each LED bank (meteorites) and fires "fireworks" (meteorite's LED moving upwards).</li>
+		<li>If the user loses the game, they enter to the "Sad Dance" mode. During the "Sad Dance" the warning LED and some meteorites LED will blink, and the cannon "falls" towards one side.</li>
+		<li>After the user wins or loses the game, the TOT is returned to the user, and the welcome mode starts. During welcome mode the meteorites LED light in a pattern, and the oxygen and power gauge move from one side to the other.</li>
+		<li>If the user does not interact with the game for a period of 30s, the game returns the TOT and goes back to welcome mode.</li>
+					  
+		</ol> 
+
+		</ul>
+      </div>
+</div>
+			  
+      </div>
+
+    </section>
+
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1 " id="state_diagrams">State Diagrams</h4>
+			There are 10 state machines/services involved:
+			  <ol type="1">
+				<li><i>Arcade FSM:</i> Controls what interactions are to occur.</li>
+				<li><i>Global Timer Service:</i> Monitors time for user to complete game.</li>
+				<li><i>Reset Service:</i> Monitors for user interaction with device.</li>
+				<li><i>Welcome FSM:</i> Executes welcome mode. </li>
+				<li><i>Air Leaks SM:</i> User interaction where user needs to plug air leaks before oxygen runs out.</li>
+				<li><i>Power Crank SM:</i> User interaction where user needs to turn a crank to generate power for the dome and be able to use the cannon.</li>
+				<li><i>Meteor SM:</i> User interaction where user needs to shoot down meteors.</li>
+				<li><i>Cannon SM:</i> Moves cannon based on analog input, and gives a vibratory feedback when meteor is destroyed.</li>
+				<li><i>Button Debounce:</i> Button for firing the cannon.</li>
+				<li><i>End Game FSM:</i> Control sequence events for winning or losing the game. Return the TOT.</li>
+			  </ol>
+			There are 5 event checkers:
+			  <ol type="1">
+				<li><i>Pot Checker:</i> Post New_Pot_Value to Reset_SM and Cannon_SM when user moves the pot.</li>
+				<li><i>Button Checker:</i> Post Button_Down to Debounce when user presses button to fire the cannon.</li>
+				<li><i>Crank Checker:</i> Post Falling_edge or Rising_Edge to Reset_SM and PowerCrank_SM if the user is moving or not the crank for power generation.</li>
+				<li><i>Air plug Checker:</i> Post AirflowPlugged to  Reset_SM and AirLeak_SM when the user plugs an air leak.</li>
+				<li><i>Tot Checker:</i> Check if TOT was inserted. Post Tot_Inserted to all.</li>
+		    </ol>
+			  <br></br>
+			  <strong>Diagrams notation: </strong> Each box corresponds to a state, the arrows are transition. The transition notation: Event_name(event_parameter)[Conditions]/ Actions.
+			  <br></br>
+		  <br></br>
+			  <div class="row"><h5 class="mt-0 mb-1">Arcade FSM</h5></div>
+			  <div class="row">
+			  <div class="col-12 text-center"><img src="images/state_diagrams/arcade_fsm.png" style="width:70%" align="center"></div>
+			  </div>
+		  
+		  		<br></br>
+		  <div class="row"> <h5 class="mt-0 mb-1">Global timer</h5></div>
+			<div class="row">  
+		  <div class="col-12 text-center"><img src="images/state_diagrams/global_timer.png" style="width:50%" ></div>
+		    </div>
+
+		  <br></br>
+		  <div class="row"> <h5 class="mt-0 mb-1">Reset Service</h5></div>
+			<div class="row">  
+		  <div class="col-12  text-center"><img src="images/state_diagrams/reset_service.png" style="width:40%" ></div>
+		    </div>
+	<br></br>
+		  <div class="row"> <h5 class="mt-0 mb-1">Welcome mode</h5></div>
+			<div class="row">  
+		  <div class="col-12 text-center"><img src="images/state_diagrams/welcome_mode.png" style="width:50%" ></div>
+		    </div>
+	
+	<br></br>
+		  <div class="row"> <h5 class="mt-0 mb-1">Air Leak SM</h5></div>
+			<div class="row">  
+		  <div class="col-12 text-center"><img src="images/state_diagrams/air_leaks.png" style="width:60%" ></div>
+		    </div>
+
+<br></br>
+		  <div class="row"> <h5 class="mt-0 mb-1">Meteor SM</h5></div>
+			<div class="row">  
+		  <div class="col-12 text-center"><img src="images/state_diagrams/meteor_sm.png" style="width:70%" ></div>
+		    </div>
+		
+
+<br></br>
+		  <div class="row"> <h5 class="mt-0 mb-1">Cannon SM</h5></div>
+			<div class="row">  
+		  <div class="col-12 text-center"><img src="images/state_diagrams/cannon_sm.png" style="width:60%" ></div>
+		    </div>
+<br></br>
+		  <div class="row"> <h5 class="mt-0 mb-1">Button Debouncer</h5></div>
+			<div class="row">  
+		  <div class="col-12 text-center"><img src="images/state_diagrams/button_debounce.png" style="width:40%" ></div>
+		    </div> 
+<br></br>
+		  <div class="row"> <h5 class="mt-0 mb-1">Power Crank</h5></div>
+			<div class="row">  
+		  <div class="col-12 text-center"><img src="images/state_diagrams/power_crank.png" style="width:45%" ></div>
+		    </div>
+<br></br>
+		  <div class="row"> <h5 class="mt-0 mb-1">End of Game FSM</h5></div>
+			<div class="row">  
+		  <div class="col-12 text-center"><img src="images/state_diagrams/end_of_game.png" style="width:80%" ></div>
+		    </div>
+
+
+</div></div>
+	</section>
+
+<br></br>
+<br></br>
+<section>
+      <div class="container mt-2">
+			
+		  <div class="row">
+          <div class="col-12"> 
+		  <h4 class="mt-0 mb-1 " id="code">Code and pseudocode listing</h4>
+			In addition to the state machines/services we created the following libraries to interact with hardware:
+			  <ol type="1">
+				<li><i>AirLeakLib:</i> Controls the 3 fans and reads the 3 hall switches. Uses the ShiftRegisterWrite module to control the fans.</li>
+				<li><i>Cannon:</i> Reads the potentiometer, positions the cannon, vibrates the knob and lights up the tip LED on the cannon. This module uses the Servo library for positioning the cannon. This module uses the AD library to read the potentiometer.</li>
+				<li><i>Crisis:</i> Controls the crisis LEDs and buzzer. Uses the SR8 module.</li>
+				<li><i>Meteor:</i> Lights up the trace LEDs for the meteors. Utilizes the low level ShiftRegisterWrite_24 module.</li>
+				<li><i>PowerLib:</i> Reads the comparator output and controls the power gauge.</li>
+				<li><i>Servo:</i>  Acts as the low level interface to move the servo motors using PWM functions.</li>
+				<li><i>ShiftRegisterWrite:</i>  Low level interface to&nbsp; write shift register.</li>
+				<li><i>ShiftRegisterWrite_24:</i> Low level interface to write to 3 cascaded shift registers.</li>
+				<li><i>TOT:</i> Looks for the TOT on insertion and controls the release of it.</li>
+			  </ol>
+			
+			  <style type="text/css">
+				td
+				{
+					padding:12px 15px 0 15px;
+				}
+				</style>
+			  
+			  
+			  <table  align="center" width="70%">
+				  <tr>
+					<th>Pseudocode</th>
+					<th >Source Code  </th>
+					<th >Header File</th>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/AirLeakLib.txt" target="_blank"><img src="images/txt.png">  AirLeakLib.txt</a></td>
+				  <td><a href="code/Highlights/Source/AirLeakLib.c.html" target="_blank"><img src="images/c.png">  AirLeakLib.c</a></td>
+				  <td><a href="code/Highlights/Headers/AirLeakLib.h.html" target="_blank"><img src="images/h.png">  AirLeakLib.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/AirLeak_SM.txt" target="_blank"><img src="images/txt.png">  AirLeak_SM.txt</a></td>
+				  <td><a href="code/Highlights/Source/AirLeak_SM.c.html" target="_blank"><img src="images/c.png">  AirLeak_SM.c</a></td>
+				  <td><a href="code/Highlights/Headers/AirLeak_SM.h.html" target="_blank"><img src="images/h.png">  AirLeak_SM.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/ArcadeFSM.txt" target="_blank"><img src="images/txt.png">  ArcadeFSM.txt</a></td>
+				  <td><a href="code/Highlights/Source/ArcadeFSM.c.html" target="_blank"><img src="images/c.png">  ArcadeFSM.c</a></td>
+				  <td><a href="code/Highlights/Headers/ArcadeFSM.h.html" target="_blank"><img src="images/h.png">  ArcadeFSM.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/ButtonDebounce.txt" target="_blank"><img src="images/txt.png">  ButtonDebounce.txt</a></td>
+				  <td><a href="code/Highlights/Source/ButtonDebounce.c.html" target="_blank"><img src="images/c.png">  ButtonDebounce.c</a></td>
+				  <td><a href="code/Highlights/Headers/ButtonDebounce.h.html" target="_blank"><img src="images/h.png">  ButtonDebounce.h</a></td>
+				  </tr> <!-- Start here-->
+				  <tr>
+				  <td><a href="code/Pseudo/Cannon.txt" target="_blank"><img src="images/txt.png">  Cannon.txt</a></td>
+				  <td><a href="code/Highlights/Source/Cannon.c.html" target="_blank"><img src="images/c.png">  Cannon.c</a></td>
+				  <td><a href="code/Highlights/Headers/Cannon.h.html" target="_blank"><img src="images/h.png">  Cannon.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/Cannon_SM.txt" target="_blank"><img src="images/txt.png">  Cannon_SM.txt</a></td>
+				  <td><a href="code/Highlights/Source/Cannon_SM.c.html" target="_blank"><img src="images/c.png">  Cannon_SM.c</a></td>
+				  <td><a href="code/Highlights/Headers/Cannon_SM.h.html" target="_blank"><img src="images/h.png">  Cannon_SM.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/Crisis.txt" target="_blank"><img src="images/txt.png">  Crisis.txt</a></td>
+				  <td><a href="code/Highlights/Source/Crisis.c.html" target="_blank"><img src="images/c.png">  Crisis.c</a></td>
+				  <td><a href="code/Highlights/Headers/Crisis.h.html" target="_blank"><img src="images/h.png">  Crisis.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/EndGameFSM.txt" target="_blank"><img src="images/txt.png">  EndGameFSM.txt</a></td>
+				  <td><a href="code/Highlights/Source/EndGameFSM.c.html" target="_blank"><img src="images/c.png">  EndGameFSM.c</a></td>
+				  <td><a href="code/Highlights/Headers/EndGameFSM.h.html" target="_blank"><img src="images/h.png">  EndGameFSM.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/GlobalTimer.txt" target="_blank"><img src="images/txt.png">  GlobalTimer.txt</a></td>
+				  <td><a href="code/Highlights/Source/GlobalTimer.c.html" target="_blank"><img src="images/c.png">  GlobalTimer.c</a></td>
+				  <td><a href="code/Highlights/Headers/GlobalTimer.h.html" target="_blank"><img src="images/h.png">  GlobalTimer.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/Meteor.txt" target="_blank"><img src="images/txt.png">  Meteor.txt</a></td>
+				  <td><a href="code/Highlights/Source/Meteor.c.html" target="_blank"><img src="images/c.png">  Meteor.c</a></td>
+				  <td><a href="code/Highlights/Headers/Meteor.h.html" target="_blank"><img src="images/h.png">  Meteor.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/Meteor_SM.txt" target="_blank"><img src="images/txt.png">  Meteor_SM.txt</a></td>
+				  <td><a href="code/Highlights/Source/Meteor_SM.c.html" target="_blank"><img src="images/c.png">  Meteor_SM.c</a></td>
+				  <td><a href="code/Highlights/Headers/Meteor_SM.h.html" target="_blank"><img src="images/h.png">  Meteor_SM.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/PowerCrank_SM.txt" target="_blank"><img src="images/txt.png">  PowerCrank_SM.txt</a></td>
+				  <td><a href="code/Highlights/Source/PowerCrank_SM.c.html" target="_blank"><img src="images/c.png">  PowerCrank_SM.c</a></td>
+				  <td><a href="code/Highlights/Headers/PowerCrank_SM.h.html" target="_blank"><img src="images/h.png">  PowerCrank_SM.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/PowerLib.txt" target="_blank"><img src="images/txt.png">  PowerLib.txt</a></td>
+				  <td><a href="code/Highlights/Source/PowerLib.c.html" target="_blank"><img src="images/c.png">  PowerLib.c</a></td>
+				  <td><a href="code/Highlights/Headers/PowerLib.h.html" target="_blank"><img src="images/h.png">  PowerLib.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/ResetService.txt" target="_blank"><img src="images/txt.png">  ResetService.txt</a></td>
+				  <td><a href="code/Highlights/Source/ResetService.c.html" target="_blank"><img src="images/c.png">  ResetService.c</a></td>
+				  <td><a href="code/Highlights/Headers/ResetService.h.html" target="_blank"><img src="images/h.png">  ResetService.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/Servo.txt" target="_blank"><img src="images/txt.png">  Servo.txt</a></td>
+				  <td><a href="code/Highlights/Source/Servo.c.html" target="_blank"><img src="images/c.png">  Servo.c</a></td>
+				  <td><a href="code/Highlights/Headers/Servo.h.html" target="_blank"><img src="images/h.png">  Servo.h</a></td>
+				  </tr>
+				   <tr>
+				  <td></td>
+				  <td></td>
+				  <td><a href="code/Highlights/Headers/ServoDefs.h.html" target="_blank"><img src="images/h.png">  ServoDefs.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/ShiftRegisterWrite.txt" target="_blank"><img src="images/txt.png">  ShiftRegisterWrite.txt</a></td>
+				  <td><a href="code/Highlights/Source/ShiftRegisterWrite.c.html" target="_blank"><img src="images/c.png">  ShiftRegisterWrite.c</a></td>
+				  <td><a href="code/Highlights/Headers/ShiftRegisterWrite.h.html" target="_blank"><img src="images/h.png">  ShiftRegisterWrite.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/ShiftRegisterWrite_24.txt" target="_blank"><img src="images/txt.png">  ShiftRegisterWrite_24.txt</a></td>
+				  <td><a href="code/Highlights/Source/ShiftRegisterWrite_24.c.html" target="_blank"><img src="images/c.png">  ShiftRegisterWrite_24.c</a></td>
+				  <td><a href="code/Highlights/Headers/ShiftRegisterWrite_24.h.html" target="_blank"><img src="images/h.png">  ShiftRegisterWrite_24.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/TOT.txt" target="_blank"><img src="images/txt.png">  TOT.txt</a></td>
+				  <td><a href="code/Highlights/Source/TOT.c.html" target="_blank"><img src="images/c.png">  TOT.c</a></td>
+				  <td><a href="code/Highlights/Headers/TOT.h.html" target="_blank"><img src="images/h.png">  TOT.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/WelcomeFSM.txt" target="_blank"><img src="images/txt.png">  WelcomeFSM.txt</a></td>
+				  <td><a href="code/Highlights/Source/WelcomeFSM.c.html" target="_blank"><img src="images/c.png">  WelcomeFSM.c</a></td>
+				  <td><a href="code/Highlights/Headers/WelcomeFSM.h.html" target="_blank"><img src="images/h.png">  WelcomeFSM.h</a></td>
+				  </tr>
+			  </table>
+			  
+			  </div>
+		</div>
+        
+</div>
+	</section>
+
+<hr>
+    
+    
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="js/jquery-3.3.1.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="js/popper.min.js"></script>
+    <script src="js/bootstrap-4.3.1.js"></script>
+  </body>
+</html>
