@@ -90,7 +90,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 01/16/12, 10:00</span>
+<span class="hl com">     Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">InitButtonDebounce</span> <span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -121,7 +121,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 10/23/11, 19:25</span>
+<span class="hl com">     Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">PostButtonDebounce</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -139,11 +139,11 @@
 <span class="hl com">   ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise</span>
 <span class="hl com"></span>
 <span class="hl com"> Description</span>
-<span class="hl com">   add your description here</span>
+<span class="hl com">   Executes code based on what events are posted to the service</span>
 <span class="hl com"> Notes</span>
 <span class="hl com">   </span>
 <span class="hl com"> Author</span>
-<span class="hl com">   J. Edward Carryer, 01/15/12, 15:23</span>
+<span class="hl com">   Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 ES_Event_t <span class="hl kwd">RunButtonDebounce</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -186,6 +186,15 @@ ES_Event_t <span class="hl kwd">RunButtonDebounce</span><span class="hl opt">(</
 <span class="hl com">/***************************************************************************</span>
 <span class="hl com"> private functions</span>
 <span class="hl com"> ***************************************************************************/</span>
+ <span class="hl com">/***</span>
+<span class="hl com">CheckButtonEvents Function Description</span>
+<span class="hl com"> 	Arguments: none</span>
+<span class="hl com"> 	Returns: bool. True if ther is a new event</span>
+<span class="hl com"> 	This function check for a button press event</span>
+<span class="hl com"></span>
+<span class="hl com"> 	Author: Trey Weber</span>
+<span class="hl com"> ***/</span>
+
 
 
 <span class="hl kwb">bool</span> <span class="hl kwd">CheckButtonEvents</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">) {</span>

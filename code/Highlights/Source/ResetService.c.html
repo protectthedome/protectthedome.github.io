@@ -50,6 +50,7 @@
 <span class="hl ppc">#define HALF_SEC (ONE_SEC/2)</span>
 <span class="hl ppc">#define TWO_SEC (ONE_SEC*2)</span>
 <span class="hl ppc">#define FIVE_SEC (ONE_SEC*5)</span>
+<span class="hl ppc">#define RESET_TIME (30*ONE_SEC)</span>
 
 <span class="hl com">/*---------------------------- Module Functions ---------------------------*/</span>
 <span class="hl com">/* prototypes for private functions for this service.They should be functions</span>
@@ -77,17 +78,17 @@
 <span class="hl com">     bool, false if error in initialization, true otherwise</span>
 <span class="hl com"></span>
 <span class="hl com"> Description</span>
-<span class="hl com">     Saves away the priority, and does any </span>
+<span class="hl com">     Saves away the priority, and does any</span>
 <span class="hl com">     other required initialization for this service</span>
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 01/16/12, 10:00</span>
+<span class="hl com">     Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">InitResetService</span> <span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
 <span class="hl opt">{</span>
   MyPriority <span class="hl opt">=</span> Priority<span class="hl opt">;</span>
-  
+
   <span class="hl kwa">return true</span><span class="hl opt">;</span>
 <span class="hl opt">}</span>
 
@@ -109,7 +110,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 10/23/11, 19:25</span>
+<span class="hl com">     Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">PostResetService</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -121,69 +122,63 @@
 <span class="hl com">    RunResetService</span>
 <span class="hl com"></span>
 <span class="hl com"> Parameters</span>
-<span class="hl com">   ES_Event_t : the event to process</span>
+<span class="hl com">   ES_Event_t : Tot_Inserted, New_Pot_Value, Airflow_Plugged, Falling_Edge,</span>
+<span class="hl com">   Rising_Edge, Cannon_Button_Down, ES_TIMEOUT, End_Of_Game</span>
 <span class="hl com"></span>
 <span class="hl com"> Returns</span>
 <span class="hl com">   ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise</span>
 <span class="hl com"></span>
 <span class="hl com"> Description</span>
-<span class="hl com">   add your description here</span>
+<span class="hl com">    Monitors for user interactions with device</span>
 <span class="hl com"> Notes</span>
-<span class="hl com">   </span>
+<span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">   J. Edward Carryer, 01/15/12, 15:23</span>
+<span class="hl com">   Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 ES_Event_t <span class="hl kwd">RunResetService</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
   ES_Event_t NewEvent<span class="hl opt">;</span>
   ES_Event_t ReturnEvent<span class="hl opt">;</span>
   ReturnEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_NO_EVENT<span class="hl opt">;</span>
-  
+
   <span class="hl kwa">switch</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType<span class="hl opt">) {</span>
     <span class="hl kwa">case</span> Tot_Inserted<span class="hl opt">:</span>
 		<span class="hl slc">//Init new 30s timer</span>
-		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> <span class="hl num">30000</span><span class="hl opt">);</span>
-    <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">TOT Inserted&quot;</span><span class="hl opt">);</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> RESET_TIME<span class="hl opt">);</span>
 	<span class="hl kwa">break</span><span class="hl opt">;</span>
-    <span class="hl kwa">case</span> New_Pot_Value<span class="hl opt">:</span> 
+    <span class="hl kwa">case</span> New_Pot_Value<span class="hl opt">:</span>
 		<span class="hl slc">//Init new 30s timer</span>
-		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> <span class="hl num">30000</span><span class="hl opt">);</span>
-    <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">NewPotValue</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> RESET_TIME<span class="hl opt">);</span>
     <span class="hl kwa">break</span><span class="hl opt">;</span>
     <span class="hl kwa">case</span> Airflow_Plugged<span class="hl opt">:</span>
 		<span class="hl slc">//Init new 30s timer</span>
-		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> <span class="hl num">30000</span><span class="hl opt">);</span>
-    <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">AirPlugged</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> RESET_TIME<span class="hl opt">);</span>
     <span class="hl kwa">break</span><span class="hl opt">;</span>
 	<span class="hl kwa">case</span> Falling_Edge<span class="hl opt">:</span>
 		<span class="hl slc">//Init new 30s timer</span>
-		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> <span class="hl num">30000</span><span class="hl opt">);</span>
-  <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">Falling Edge</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> RESET_TIME<span class="hl opt">);</span>
 	<span class="hl kwa">break</span><span class="hl opt">;</span>
 	<span class="hl kwa">case</span> Rising_Edge<span class="hl opt">:</span>
 		<span class="hl slc">//Init new 30s timer</span>
-		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> <span class="hl num">30000</span><span class="hl opt">);</span>
-  <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">Rising Edge</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> RESET_TIME<span class="hl opt">);</span>
 	<span class="hl kwa">break</span><span class="hl opt">;</span>
 	<span class="hl kwa">case</span> Cannon_Button_Down<span class="hl opt">:</span>
 		<span class="hl slc">//Init new 30s timer;</span>
-		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> <span class="hl num">30000</span><span class="hl opt">);</span>
+		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">,</span> RESET_TIME<span class="hl opt">);</span>
 	<span class="hl kwa">break</span><span class="hl opt">;</span>
 	<span class="hl kwa">case</span> ES_TIMEOUT<span class="hl opt">:</span>
-    <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">RESET</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
 		<span class="hl slc">//Post reset event to all</span>
 		NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> RST<span class="hl opt">;</span>
 		<span class="hl kwd">ES_PostAll</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
 		<span class="hl slc">//Post go welcome mode event to Welcome_SM</span>
 		NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Go_Welcome_Mode<span class="hl opt">;</span>
 		<span class="hl kwd">PostWelcomeFSM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
-    <span class="hl slc">//TOT_Release();</span>
 	<span class="hl kwa">break</span><span class="hl opt">;</span>
   <span class="hl kwa">case</span> End_Of_Game<span class="hl opt">:</span>
     <span class="hl kwd">ES_Timer_StopTimer</span><span class="hl opt">(</span>RESET_TIMER<span class="hl opt">);</span>
   <span class="hl kwa">break</span><span class="hl opt">;</span>
   <span class="hl opt">}</span>
- 
+
   <span class="hl kwa">return</span> ReturnEvent<span class="hl opt">;</span>
 <span class="hl opt">}</span>
 
@@ -192,10 +187,9 @@ ES_Event_t <span class="hl kwd">RunResetService</span><span class="hl opt">(</sp
 <span class="hl com"> ***************************************************************************/</span>
 
 
- 
+
 <span class="hl com">/*------------------------------- Footnotes -------------------------------*/</span>
 <span class="hl com">/*------------------------------ End of file ------------------------------*/</span>
-
 </pre>
 </body>
 </html>

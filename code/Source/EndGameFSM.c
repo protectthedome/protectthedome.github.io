@@ -33,8 +33,15 @@
 #define WIN_DELAY 200
 #define LOSE_DELAY 100
 #define LED_MOD 5
-#define MAX( a, b ) ( ( a > b) ? a : b ) // this might be poor practice...
+#define MAX( a, b ) ( ( a > b) ? a : b )
 #define OFF_DELAY 500
+
+#define TOTAL_NUMBER_LED 8 //total number of LED per bank (8)
+#define LAST_LED TOTAL_NUMBER_LED //last LED is number 8, closer to the dome
+#define FIRST_LED_BANK 0
+#define MIDDLE_LED_BANK 1
+#define LAST_LED_BANK 2
+#define CANNON_CENTER_POS 50
 
 /*---------------------------- Module Functions ---------------------------*/
 /* prototypes for private functions for this machine.They should be functions
@@ -78,7 +85,7 @@ static bool CannonDirection;
      other required initialization for this state machine
  Notes
 
-
+Author: Rachel Thomasson
 ****************************************************************************/
 bool InitEndGameFSM(uint8_t Priority)
 {
@@ -112,7 +119,7 @@ bool InitEndGameFSM(uint8_t Priority)
  Description
      Posts an event to this state machine's queue
  Notes
-
+Author: Rachel Thomasson
 ****************************************************************************/
 bool PostEndGameFSM(ES_Event_t ThisEvent)
 {
@@ -124,16 +131,17 @@ bool PostEndGameFSM(ES_Event_t ThisEvent)
     RunEndGameFSM
 
  Parameters
-   ES_Event_t : the event to process
+   ES_Event_t : ES_INIT, End_Of_Game, ES_TIMEOUT, Tot_Inserted
 
  Returns
    ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise
 
  Description
-   add your description here
- Notes
-   uses nested switch/case to implement the machine.
+   Control events during End_Of_Game.
+   Different LED pattern and actions for GAME_OVER and Win.
 
+
+Author: Rachel Thomasson
 ****************************************************************************/
 ES_Event_t RunEndGameFSM(ES_Event_t ThisEvent)
 {
@@ -163,13 +171,10 @@ ES_Event_t RunEndGameFSM(ES_Event_t ThisEvent)
           {
             // Start timer
             ES_Timer_InitTimer(ENDOFGAME_TIMER, WIN_DELAY);
-            // return TOT
-            TOT_Release();
-            Crisis_Buzzer(Off);
             // initialize counter to number of LEDs (8)
-            counter = 8;
+            counter = TOTAL_NUMBER_LED;
             // initialize position to 0
-            position = 0;
+            position = FIRST_LED_BANK;
             // move cannon to the first position
             Cannon_MoveToBank(position);
             // set current state to HappyDance
@@ -180,12 +185,9 @@ ES_Event_t RunEndGameFSM(ES_Event_t ThisEvent)
           {
             // start timer
             ES_Timer_InitTimer(ENDOFGAME_TIMER, LOSE_DELAY);
-            // return TOT
-            TOT_Release();
-            Crisis_Buzzer(Off);
             // determine how far from upright the cannon currently is
             int8_t CannonPosFromUp;
-            CannonPosFromUp = (50 - QueryCannonPosition());
+            CannonPosFromUp = (CANNON_CENTER_POS - QueryCannonPosition());
             // decide which way cannon should fall
             if (CannonPosFromUp > 0)
             {
@@ -222,7 +224,7 @@ ES_Event_t RunEndGameFSM(ES_Event_t ThisEvent)
         {
           if (counter > 0)
           {
-            if (counter == 8)
+            if (counter == TOTAL_NUMBER_LED)
             {
               // light up cannon LED
               Cannon_LED(On);
@@ -237,15 +239,15 @@ ES_Event_t RunEndGameFSM(ES_Event_t ThisEvent)
             // init timer
             ES_Timer_InitTimer(ENDOFGAME_TIMER, WIN_DELAY);
           }
-          else if ( (counter == 0) && (position < 3) )
+          else if ( (counter == 0) && (position < (LAST_LED_BANK+1)) )
           {
             // increment position
             position = position + 1;
             // move cannon to next position
             Cannon_MoveToBank(position);
             // reset counter
-            counter = 8;
-            if (position == 3)
+            counter = TOTAL_NUMBER_LED;
+            if (position == (LAST_LED_BANK+1))
             {
                 // turn off all LEDs
                 Meteor_ClearAll();
@@ -255,13 +257,13 @@ ES_Event_t RunEndGameFSM(ES_Event_t ThisEvent)
                 // wait a hot sec
                 ES_Timer_InitTimer(ENDOFGAME_TIMER, OFF_DELAY); //I changed off_delay to zero for testing. It possibly may be interfering with existing timer?
             }
-            else 
+            else
             {
                 // init timer
                 ES_Timer_InitTimer(ENDOFGAME_TIMER, WIN_DELAY);
             }
           }
-          else if (position == 3)
+          else if (position == (LAST_LED_BANK+1))
           {
             // post Go_Welcome_Mode to WelcomeFSM
             ES_Event_t NextEvent;
@@ -290,7 +292,7 @@ ES_Event_t RunEndGameFSM(ES_Event_t ThisEvent)
     break;
 
     case SadDance:
-    {      
+    {
       switch (ThisEvent.EventType)
       {
         case ES_TIMEOUT:
@@ -322,20 +324,18 @@ ES_Event_t RunEndGameFSM(ES_Event_t ThisEvent)
             }
             // move gauges down
             AirLeak_MoveGauge(AirLeak_QueryGauge() - 1);
-            PowerLib_MoveGauge(PowerLib_QueryGauge() - 1); 
+            PowerLib_MoveGauge(PowerLib_QueryGauge() - 1);
 
             if (ToggleOn)
             {
               // toggle LEDs touching the dome
-              Meteor_LightLEDBank(0, 8);
-              Meteor_LightLEDBank(1, 8);
-              Meteor_LightLEDBank(2, 8);
+              Meteor_LightLEDBank(FIRST_LED_BANK, LAST_LED);
+              Meteor_LightLEDBank(MIDDLE_LED_BANK, LAST_LED);
+              Meteor_LightLEDBank(LAST_LED_BANK, LAST_LED);
               // toggle indicator lights
               Crisis_Meteor(On);
               Crisis_AirLeak(On);
               Crisis_Power(On);
-              // toggle buzzer
-              //Crisis_Buzzer(On);
               // switch ToggleOn to False
               ToggleOn = false;
             }
@@ -347,8 +347,6 @@ ES_Event_t RunEndGameFSM(ES_Event_t ThisEvent)
               Crisis_Meteor(Off);
               Crisis_AirLeak(Off);
               Crisis_Power(Off);
-              // toggle buzzer
-              //Crisis_Buzzer(Off);
               // switch ToggleOn to True
               ToggleOn = true;
             }
@@ -364,7 +362,7 @@ ES_Event_t RunEndGameFSM(ES_Event_t ThisEvent)
                 // wait a hot sec
                 ES_Timer_InitTimer(ENDOFGAME_TIMER, OFF_DELAY);
             }
-            else 
+            else
             {
                 // init timer
                 ES_Timer_InitTimer(ENDOFGAME_TIMER, LOSE_DELAY);

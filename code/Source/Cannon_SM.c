@@ -79,7 +79,7 @@ static ES_Event_t DeferralQueue[3+1];
  Notes
 
  Author
-     J. Edward Carryer, 01/16/12, 10:00
+     Trey Weber
 ****************************************************************************/
 bool InitCannon_SM ( uint8_t Priority )
 {
@@ -131,7 +131,7 @@ bool InitCannon_SM ( uint8_t Priority )
  Notes
 
  Author
-     J. Edward Carryer, 10/23/11, 19:25
+	Trey Weber
 ****************************************************************************/
 bool PostCannon_SM( ES_Event_t ThisEvent )
 {
@@ -153,7 +153,7 @@ bool PostCannon_SM( ES_Event_t ThisEvent )
  Notes
    
  Author
-   J. Edward Carryer, 01/15/12, 15:23
+   Trey Weber
 ****************************************************************************/
 ES_Event_t RunCannon_SM( ES_Event_t ThisEvent )
 {
@@ -179,13 +179,11 @@ ES_Event_t RunCannon_SM( ES_Event_t ThisEvent )
 	}
 	//else if meteor is destroyed
 	else if (ThisEvent.EventType == Meteor_Destroyed) {
-    //printf("\rMeteor Destroyed\r\n"); 
 		//Start timer
 		ES_Timer_InitTimer(CANNON_TIMER, 1500);
 		//Start vibratory motor
 		CannonState = On;
 		Cannon_Vibrate(CannonState);
-    
 		//Update current state
 		CurrentSMState = KnobVibrating;
 	}
@@ -201,7 +199,6 @@ ES_Event_t RunCannon_SM( ES_Event_t ThisEvent )
 	}
 	//Else if we receive a new pot value
 	else if(ThisEvent.EventType == New_Pot_Value) {
-     //printf("move to new pot value %u\n\r",ThisEvent.EventParam);
 		//Position cannon
 		Cannon_UserPosition(ThisEvent.EventParam);		
 	}
@@ -254,6 +251,15 @@ ES_Event_t RunCannon_SM( ES_Event_t ThisEvent )
 /***************************************************************************
  private functions
  ***************************************************************************/
+ /***
+PotChecker Function Description
+ 	Arguments: none
+ 	Returns: bool. True if there is a new event
+ 	This function check for the change in knob position
+
+ 	Author: Trey Weber
+ ***/
+
 
 bool PotChecker(void) {
   ES_Event_t NewEvent;
@@ -264,7 +270,6 @@ bool PotChecker(void) {
   
   //If pot has been turned more than 1%
   if (abs(ADPotVal-CurrentCannonADCount) > DELTA) {
-	  //printf("\rNew Pot Value!\r\n");
     //Post to service
 	  NewEvent.EventType = New_Pot_Value;
 	  NewEvent.EventParam = ADPotVal;

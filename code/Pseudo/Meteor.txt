@@ -1,26 +1,26 @@
 /***
 Meteor_HWInit Function Description
-	Arugments: None
+	Arguments: None
 	Returns: None
-	Call the SR24 init function to intialize hardware to communicate with the 
+	Call the SR24 init function to initialize hardware to communicate with the
 	cascaded registers
 ***/
 {
-	Call SR24_HWInit fucntion
+	Call SR24_HWInit function
 }
 
 /***
 Meteor_LightLEDBank Function Description
-	Arugments: BankNum, LEDNum
+	Arguments: BankNum, LEDNum
 		BankNum: the bank to work with
 		LEDNum: LED in the bank wished to light, 0 means all off
 	Returns: Status
 		If State = false, invalid parameters where given
-	Figures out what value to write to SR24 to get the right LED lit. Will use 
+	Figures out what value to write to SR24 to get the right LED lit. Will use
 	masks to preserve the lighting on any other trace
 ***/
 {
-	Set return val to false as defualt
+	Set return val to false as default
 	If LEDNum > 8 or Bank num  > 2
 		set returnVal to false
 		return
@@ -34,14 +34,14 @@ Meteor_LightLEDBank Function Description
 		Create a uint 32bit variable and make it 1
 		Shift the 1 left by banknum*8+LEDnum
 		OR with masked register value
-	end if	
+	end if
 	call SR24_write to write value to shift register
 	Return the return val
 }
 
 /***
 Meteor_ClearAll Function Description
-	Arugments: None
+	Arguments: None
 	Returns: None
 	Calls clear bank for each bank
 ***/

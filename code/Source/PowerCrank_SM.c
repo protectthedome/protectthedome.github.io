@@ -89,7 +89,7 @@ static ES_Event_t DeferralQueue[3+1];
  Notes
 
  Author
-     J. Edward Carryer, 01/16/12, 10:00
+     Trey Weber
 ****************************************************************************/
 bool InitPowerCrank_SM ( uint8_t Priority )
 {
@@ -102,7 +102,6 @@ bool InitPowerCrank_SM ( uint8_t Priority )
   
   return true;
 }
-
 
 
 
@@ -121,8 +120,7 @@ bool InitPowerCrank_SM ( uint8_t Priority )
  Notes
 
  Author
-     J. Edward Carryer, 10/23/11, 19:25
-****************************************************************************/
+	Trey Weber     ****************************************************************************/
 bool PostPowerCrank_SM( ES_Event_t ThisEvent )
 {
   return ES_PostToService( MyPriority, ThisEvent);
@@ -143,8 +141,7 @@ bool PostPowerCrank_SM( ES_Event_t ThisEvent )
  Notes
    
  Author
-   J. Edward Carryer, 01/15/12, 15:23
-****************************************************************************/
+	Trey Weber   ****************************************************************************/
 ES_Event_t RunPowerCrank_SM( ES_Event_t ThisEvent )
 {
   ES_Event_t NewEvent;
@@ -155,7 +152,6 @@ ES_Event_t RunPowerCrank_SM( ES_Event_t ThisEvent )
     case NotCranking: 
 	//Check for Falling edge
 	if (ThisEvent.EventType == Falling_Edge) {
-    printf("GOT FALLING EDGE \n\r");
 		//Initialize timer
 		ES_Timer_InitTimer(CRANK_TIMER, 50);
 		//Update current state
@@ -167,7 +163,6 @@ ES_Event_t RunPowerCrank_SM( ES_Event_t ThisEvent )
 		CurrentTimePercentage = 0;
 	}	
   else if (ThisEvent.EventType == ES_TIMEOUT) {
-    //printf("CRANK TIMEOUT \n\r");
 		//Check if we are below max count
 		if (counter < MAX_COUNT) {
 			//Increment counter
@@ -179,7 +174,6 @@ ES_Event_t RunPowerCrank_SM( ES_Event_t ThisEvent )
 		//else we have reached maximum count
 		else {
 		//Post interaction complete to arcade SM
-    printf(" FINISHED CRANKING SUCCESSFULLY \n\r");
 		NewEvent.EventType = Interaction_Completed;
 		PostArcadeFSM(NewEvent);
 		//Post Power complete to cannon SM
@@ -209,7 +203,6 @@ ES_Event_t RunPowerCrank_SM( ES_Event_t ThisEvent )
 	}
 	//else if we get a timeout
 	else if (ThisEvent.EventType == ES_TIMEOUT) {
-    //printf("CRANK TIMEOUT \n\r");
 		//Check if we are below max count
 		if (counter < (MAX_COUNT)) {
 			//Increment counter
@@ -223,7 +216,6 @@ ES_Event_t RunPowerCrank_SM( ES_Event_t ThisEvent )
 		//else we have reached maximum count
 		else {
 		//Post interaction complete to arcade SM
-    printf(" FINISHED CRANKING SUCCESSFULLY \n\r");
 		NewEvent.EventType = Interaction_Completed;
 		PostArcadeFSM(NewEvent);
 		//Post Power complete to cannon SM
@@ -241,18 +233,15 @@ ES_Event_t RunPowerCrank_SM( ES_Event_t ThisEvent )
 	case Idle_PC:
 	//Power regen interaction begin
 	if (ThisEvent.EventType == Low_Power) {
-     printf("BEGIN CRANK INTERACTION \n\r");
 		//Check if state is low 
 		uint8_t PinState = PowerLib_PinState();
 		if (PinState == 1) {
 			//Update state
 			CurrentSMState = NotCranking;
-      printf("Going to not cranking \n\r");
 		}
 		//Else it is high
 		else {
 			//Update state
-      printf("Going to cranking \n\r");
 			CurrentSMState = Cranking;
 			//Init timer
 			ES_Timer_InitTimer(CRANK_TIMER, 30);
@@ -279,26 +268,32 @@ PowerCrank_SMState_t QueryPowerCrank_SM(void) {
 /***************************************************************************
  private functions
  ***************************************************************************/
+ /***
+CheckPowerCrankEvents Function Description
+ 	Arguments: none
+ 	Returns: bool. True if ther is a new event
+ 	This function check for the rotation of the power crank
+
+
+ 	Author: Trey Weber
+ ***/
+
  
 bool CheckPowerCrankEvents(void){
   ES_Event_t NewEvent;
   bool ReturnVal = false;
 
   //Get current input state
-  uint8_t CurrentInputState = PowerLib_PinState();
-  //printf("\rI'm reading the pin!\r\n");
-  
+  uint8_t CurrentInputState = PowerLib_PinState();  
   //Check if state has changed
   if (CurrentInputState != LastInputState) {
     if (CurrentInputState != 0) { //Found rising edge
       NewEvent.EventType = Rising_Edge;
-      printf("\rEC: Rising Edge\r\n");
       PostPowerCrank_SM(NewEvent);
       PostResetService(NewEvent);
     }
     else { //Found falling edge
       NewEvent.EventType = Falling_Edge;
-      //printf("\rEC: Falling Edge\r\n");
       PostPowerCrank_SM(NewEvent);
       PostResetService(NewEvent);
     }

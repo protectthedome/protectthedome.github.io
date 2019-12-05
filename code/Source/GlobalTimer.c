@@ -82,7 +82,7 @@ static ES_Event_t DeferralQueue[3+1];
  Notes
 
  Author
-     T. Weber
+     Trey Weber
 ****************************************************************************/
 bool InitGlobalTimer ( uint8_t Priority )
 {
@@ -93,8 +93,6 @@ bool InitGlobalTimer ( uint8_t Priority )
   
   return true;
 }
-
-
 
 
 /****************************************************************************
@@ -112,7 +110,7 @@ bool InitGlobalTimer ( uint8_t Priority )
  Notes
 
  Author
-     J. Edward Carryer, 10/23/11, 19:25
+     Trey Weber
 ****************************************************************************/
 bool PostGlobalTimer( ES_Event_t ThisEvent )
 {
@@ -134,7 +132,7 @@ bool PostGlobalTimer( ES_Event_t ThisEvent )
  Notes
    
  Author
-   T. Weber
+   Trey Weber
 ****************************************************************************/
 ES_Event_t RunGlobalTimer( ES_Event_t ThisEvent )
 {

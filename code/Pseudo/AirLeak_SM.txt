@@ -33,15 +33,15 @@ End function
 Run function: RunAirLeakSM (param: ThisEvent)
   Create event variable ReturnEvent of type ES_NO_EVENT
   Create event variable NewEvent
-  Switch CurrentState
-    Case CurrentState is Idle_A
+  What is the CurrentState?
+    CurrentState is Idle_A:
       If ThisEvent.EventType equal to Tot_Inserted
         Call library function AirLeak_MoveGauge with MAX_OXIGEN_LEVEL as position
         Indices[] equal {0, 1, 2} (Assigned with a for loop)
       End if
       If ThisEvent.EventType equal to Leak_Develops
         Save system time in variable SysTime
-        Fan equal to RandomExclusive(SysTime)
+        Call RandomExclusivew/ param SysTime. Set Fan to what func returns
         Call library function AirLeak_FanControl to turn Fan On
         Init AIRLEAK_TIMER with STEP_TIME
         Save CurrentState equal to FanOn
@@ -50,43 +50,40 @@ Run function: RunAirLeakSM (param: ThisEvent)
       If ThisEvent.EventType equal to End_Of_Game or RST
         MachineCounter equal 0
       End if
-    break
-    End Case
-    Case CurrentState is FanOn
+
+    CurrentState is FanOn:
       Call library function  AirLeak_QueryGauge to get current Oxygen_Level
       If TIME_OUT and Oxygen_Level greater than 0
         Call library function AirLeak_MoveGauge to decrement oxygen level, pass as param Oxygen_Level - STEP_OXIGEN
         Init AIRLEAK_TIMER with STEP_TIME
-      Else If TIME_OUT Oxygen_Level less or equal to 0
-        Post to all event End_Of_Game with parameter Game_Over
+      Else If TIME_OUT and Oxygen_Level less or equal to 0
+        Post to all events End_Of_Game with parameter Game_Over
         Call library function AirLeak_FanControl to turn Fan Off
-        CurrentState equal Idle_A
-        Fan equal 3, an invalid Fan
+        Set CurrentState to Idle_A
+        and set Fan to 3, an invalid Fan
       End if
       If ThisEvent.EventType equal to AirflowPlugged
         Call library function AirLeak_FanControl to turn Fan Off
         Post Interaction_Completed to Arcade_SM
         Call library function AirLeak_MoveGauge with MAX_OXIGEN_LEVEL as position
-        CurrentState equal Idle_A
-        Fan equal 3, an invalid Fan
+        Set CurrentState to Idle_A
+        and set Fan to 3, an invalid Fan
       End if
       If ThisEvent.EventType equal to RST
         Call library function AirLeak_FanControl to turn Fan Off
-        CurrentState qual Idle_A
         FanIndex equal 0
         MachineCounter equal 0
-        Fan equal 3, an invalid Fan
+        Set CurrentState to Idle_A
+        and set Fan to 3, an invalid Fan
       End if
       If ThisEvent.EventType equal to End_Of_Game
         Call library function AirLeak_FanControl to turn Fan Off
-        CurrentState equal Idle_A
         FanIndex equal 0
         MachineCounter equal 0
-        Fan equal 3, an invalid Fan
+		Set CurrentState to Idle_A
+        and set Fan to 3, an invalid Fan	
       end if
-    break
-    End Case
-  End switch
+
   Return ReturnEvent
 End Function
 

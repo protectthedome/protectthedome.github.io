@@ -3,7 +3,7 @@ PowerLib_HWInit Function Description
 	Returns nothing
 {
   Turn on PORTD
-	Intialise PD6 as digital input
+	Initialize PD6 as digital input
 }
 
 PowerLib_PinState Function Description
@@ -21,10 +21,10 @@ PowerLib_MoveGauge Function Description
 	Arguments: position
 	Return: PWM status (t or f)
 	Calls the servo library for MovePowerGauge
-	
+
 {
   Cal the servo lib function
-  Update gauge position if movement sucessful
+  Update gauge position if movement successful
   return status
 }
 

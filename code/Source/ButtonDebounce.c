@@ -83,7 +83,7 @@ static ES_Event_t DeferralQueue[3+1];
  Notes
 
  Author
-     J. Edward Carryer, 01/16/12, 10:00
+     Trey Weber
 ****************************************************************************/
 bool InitButtonDebounce ( uint8_t Priority )
 {
@@ -114,7 +114,7 @@ bool InitButtonDebounce ( uint8_t Priority )
  Notes
 
  Author
-     J. Edward Carryer, 10/23/11, 19:25
+     Trey Weber
 ****************************************************************************/
 bool PostButtonDebounce( ES_Event_t ThisEvent )
 {
@@ -132,11 +132,11 @@ bool PostButtonDebounce( ES_Event_t ThisEvent )
    ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise
 
  Description
-   add your description here
+   Executes code based on what events are posted to the service
  Notes
    
  Author
-   J. Edward Carryer, 01/15/12, 15:23
+   Trey Weber
 ****************************************************************************/
 ES_Event_t RunButtonDebounce( ES_Event_t ThisEvent )
 {
@@ -179,6 +179,15 @@ ES_Event_t RunButtonDebounce( ES_Event_t ThisEvent )
 /***************************************************************************
  private functions
  ***************************************************************************/
+ /***
+CheckButtonEvents Function Description
+ 	Arguments: none
+ 	Returns: bool. True if ther is a new event
+ 	This function check for a button press event
+
+ 	Author: Trey Weber
+ ***/
+
 
 
 bool CheckButtonEvents(void) {

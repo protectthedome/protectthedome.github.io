@@ -103,7 +103,7 @@
 			<li>On the back panel, the first LED of one of the 3 meteorite banks will turn on. The meteorite will move downwards, closer to the dome.</li>
 			<li>If the meteorite reaches the dome, the user loses the game.</li>
 			<li>To shoot down the meteorite the user needs to move the cannon, pointing it towards the meteorite, and then press the blue button to fire the cannon.</li>
-			<li>When the user presses the blue button, a blue LED on the cannon tip will light. If the meteorite is in range the meteorite will disappear, the nob will vibrate, and the crisis indicator LED will go off.</li>
+			<li>When the user presses the blue button, a blue LED on the cannon tip will light. If the meteorite is in range the meteorite will disappear, the knob will vibrate, and the crisis indicator LED will go off.</li>
 			</ol>
 			<strong>Air Leaks:</strong>
 			<ol type="1">
@@ -230,7 +230,7 @@
 			In addition to the state machines/services we created the following libraries to interact with hardware:
 			  <ol type="1">
 				<li><i>AirLeakLib:</i> Controls the 3 fans and reads the 3 hall switches. Uses the ShiftRegisterWrite module to control the fans.</li>
-				<li><i>Cannon:</i> Reads the potentiometer, positions the cannon, vibrates the knob and lights up the tip LED on the cannon. This module uses the Servo library for positioning the cannon. This module uses the AD library to read the potentiometer.</li>
+				<li><i>Cannon:</i> Reads the potentiometer, positions the cannon, vibrates the knob and lights up the tip LED on the cannon. This module uses the servo library for positioning the cannon. This module uses the AD library to read the potentiometer.</li>
 				<li><i>Crisis:</i> Controls the crisis LEDs and buzzer. Uses the SR8 module.</li>
 				<li><i>Meteor:</i> Lights up the trace LEDs for the meteors. Utilizes the low level ShiftRegisterWrite_24 module.</li>
 				<li><i>PowerLib:</i> Reads the comparator output and controls the power gauge.</li>
@@ -324,16 +324,7 @@
 				  <td><a href="code/Highlights/Source/ResetService.c.html" target="_blank"><img src="images/c.png">  ResetService.c</a></td>
 				  <td><a href="code/Highlights/Headers/ResetService.h.html" target="_blank"><img src="images/h.png">  ResetService.h</a></td>
 				  </tr>
-				  <tr>
-				  <td><a href="code/Pseudo/Servo.txt" target="_blank"><img src="images/txt.png">  Servo.txt</a></td>
-				  <td><a href="code/Highlights/Source/Servo.c.html" target="_blank"><img src="images/c.png">  Servo.c</a></td>
-				  <td><a href="code/Highlights/Headers/Servo.h.html" target="_blank"><img src="images/h.png">  Servo.h</a></td>
-				  </tr>
-				   <tr>
-				  <td></td>
-				  <td></td>
-				  <td><a href="code/Highlights/Headers/ServoDefs.h.html" target="_blank"><img src="images/h.png">  ServoDefs.h</a></td>
-				  </tr>
+				  
 				  <tr>
 				  <td><a href="code/Pseudo/ShiftRegisterWrite.txt" target="_blank"><img src="images/txt.png">  ShiftRegisterWrite.txt</a></td>
 				  <td><a href="code/Highlights/Source/ShiftRegisterWrite.c.html" target="_blank"><img src="images/c.png">  ShiftRegisterWrite.c</a></td>
@@ -353,6 +344,16 @@
 				  <td><a href="code/Pseudo/WelcomeFSM.txt" target="_blank"><img src="images/txt.png">  WelcomeFSM.txt</a></td>
 				  <td><a href="code/Highlights/Source/WelcomeFSM.c.html" target="_blank"><img src="images/c.png">  WelcomeFSM.c</a></td>
 				  <td><a href="code/Highlights/Headers/WelcomeFSM.h.html" target="_blank"><img src="images/h.png">  WelcomeFSM.h</a></td>
+				  </tr>
+				  <tr>
+				  <td><a href="code/Pseudo/Servo.txt" target="_blank"><img src="images/txt.png">  Servo.txt</a></td>
+				  <td><a href="code/Highlights/Source/Servo.c.html" target="_blank"><img src="images/c.png">  Servo.c</a></td>
+				  <td><a href="code/Highlights/Headers/Servo.h.html" target="_blank"><img src="images/h.png">  Servo.h</a></td>
+				  </tr>
+				   <tr>
+				  <td></td>
+				  <td></td>
+				  <td><a href="code/Highlights/Headers/ServoDefs.h.html" target="_blank"><img src="images/h.png">  ServoDefs.h</a></td>
 				  </tr>
 			  </table>
 

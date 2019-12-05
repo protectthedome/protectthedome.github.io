@@ -27,9 +27,6 @@
 #include "Meteor.h"
 
 
-//Will need lots of includes as we finish modules!
-
-
 /* include header files for hardware access
 */
 #include "inc/hw_memmap.h"
@@ -61,6 +58,12 @@
 
 #define TOT_TIME 2000 //changed from 2000
 
+#define AIRLEAK_INTERACTION 2
+#define METEOR_INTERACTION 3
+
+#define   TIME_BTW_INTERACTIONS (2.5*ONE_SEC)
+#define BUZZER_TIME (ONE_SEC)
+
 /*---------------------------- Module Functions ---------------------------*/
 /* prototypes for private functions for this service.They should be functions
    relevant to the behavior of this service
@@ -68,7 +71,7 @@
 
 bool TotChecker(void);
 
-//ADD CODE DISTINGUISHING TIMEOUTS
+
 
 /*---------------------------- Module Variables ---------------------------*/
 // with the introduction of Gen2, we need a module level Priority variable
@@ -76,14 +79,15 @@ static uint8_t MyPriority;
 static ArcadeFSMState_t CurrentSMState;
 UI_State_t CrisisLEDState;
 
-//2 denotes power regen, 3 denotes meteor.
-static const uint8_t InteractionList[NUM_INTERACTIONS] = {3,3,2,3,3,2,3,3};
+
+static const uint8_t InteractionList[NUM_INTERACTIONS] = {METEOR_INTERACTION,
+  METEOR_INTERACTION,AIRLEAK_INTERACTION,METEOR_INTERACTION,METEOR_INTERACTION,
+  AIRLEAK_INTERACTION,METEOR_INTERACTION,METEOR_INTERACTION};
 
 //Track index of InteractionList
 static uint8_t InteractionIndex = 0;
 UI_State_t BuzzerState;
 static uint8_t LastTotState = 1;
-
 
 
 // add a deferral queue for up to 3 pending deferrals +1 to allow for overhead
@@ -101,35 +105,32 @@ static ES_Event_t DeferralQueue[3+1];
      bool, false if error in initialization, true otherwise
 
  Description
-     Saves away the priority, and does any 
+     Saves away the priority, and does any
      other required initialization for this service
  Notes
 
  Author
-     J. Edward Carryer, 01/16/12, 10:00
+     Trey Weber
 ****************************************************************************/
 bool InitArcadeFSM ( uint8_t Priority )
 {
   MyPriority = Priority;
- 
-  //Does any hardware need to be initialized? 
-  //Servo_HWInit();
-  
+
   //Initialize TOT
   TOT_HWInit();
   TOT_Block();
-  
+
   Meteor_LightLEDBank(0, 0);
 
   //Intialzie Deferral Queue
   ES_InitDeferralQueueWith(DeferralQueue, ARRAY_SIZE(DeferralQueue));
-  
+
   //Initialize AirLeak HW (includes crisis LEDs)
   AirLeak_Init();
-  
+
   //Set SM currentstate
   CurrentSMState = NotPlaying;
- 
+
   return true;
 }
 
@@ -151,7 +152,7 @@ bool InitArcadeFSM ( uint8_t Priority )
  Notes
 
  Author
-     J. Edward Carryer, 10/23/11, 19:25
+     Trey Weber
 ****************************************************************************/
 bool PostArcadeFSM( ES_Event_t ThisEvent )
 {
@@ -163,26 +164,30 @@ bool PostArcadeFSM( ES_Event_t ThisEvent )
     RunArcadeFSM
 
  Parameters
-   ES_Event_t : the event to process
+   ES_Event_t : Tot_Inserted, End_Of_Game, RST, TIME_OUT, Interaction_Completed
+   Global_Time_Out
 
  Returns
    ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise
 
  Description
-   add your description here
+   Controls which is the current active game (power crank, air leak, or meteor)
+   Controls the warning LED and BUZZER
+   Controls the Release of TOT
+   Control End_Of_Game due Global_Time_Out
  Notes
-   
+
  Author
-   
+   Trey Weber
 ****************************************************************************/
 ES_Event_t RunArcadeFSM( ES_Event_t ThisEvent )
 {
   ES_Event_t NewEvent;
   ES_Event_t ReturnEvent;
   ReturnEvent.EventType = ES_NO_EVENT;
-  
+
   switch (CurrentSMState) {
-    case NotPlaying: 
+    case NotPlaying:
 	//If TOT is inserted
 	if (ThisEvent.EventType == Tot_Inserted) {
     Meteor_LightLEDBank(0, 0);
@@ -193,13 +198,10 @@ ES_Event_t RunArcadeFSM( ES_Event_t ThisEvent )
 		CurrentSMState = Playing;
 		//Turn on Crisis LED
 		CrisisLEDState = On;
-		Crisis_Power(CrisisLEDState); 
-    //BuzzerState = On;
-    //printf("Buzz\r\n");
-	  //Crisis_Buzzer(BuzzerState);
+		Crisis_Power(CrisisLEDState);
     ES_Timer_InitTimer(INTERACTION_TIMER, DELAY_TIME);
 	}
- 
+
     break;
     case Playing:
 	//If we get a reset event or end of game
@@ -215,22 +217,21 @@ ES_Event_t RunArcadeFSM( ES_Event_t ThisEvent )
 	//Otherwise if we get a buzzer timeout
 	else if (ThisEvent.EventType == ES_TIMEOUT) {
 		//Turn off buzzer
-    printf("BUZZER OFF");
 		BuzzerState = Off;
 		Crisis_Buzzer(BuzzerState);
 		}
-	//Otherwise if an interaction is complete	
+	//Otherwise if an interaction is complete
 	else if (ThisEvent.EventType == Interaction_Completed) {
 		//Turn off warning LEDs
 		CrisisLEDState = Off;
-    
+
 		Crisis_Power(CrisisLEDState);
 		Crisis_AirLeak(CrisisLEDState);
 		Crisis_Meteor(CrisisLEDState);
 
 		//Initialize timer (few seconds)
-     ES_Timer_InitTimer(INTERACTION_TIMER, 2500);
-  
+     ES_Timer_InitTimer(INTERACTION_TIMER, TIME_BTW_INTERACTIONS);
+
      CurrentSMState = WaitForNext;
 	}
 	//Otherwise if we get a global timeout
@@ -253,7 +254,7 @@ ES_Event_t RunArcadeFSM( ES_Event_t ThisEvent )
 		}
 	 ES_Timer_InitTimer(INTERACTION_TIMER, TOT_TIME);
     CurrentSMState = WaitForTotRelease;
-	}	
+	}
     break;
 	case WaitForNext:
 	//Check for Timeout
@@ -272,24 +273,21 @@ ES_Event_t RunArcadeFSM( ES_Event_t ThisEvent )
       TOT_Release();
 		}
 			//Check if next event in list is meteor
-		else if (InteractionList[InteractionIndex] == 3) {
-      printf("Start meteor\r\n");
+		else if (InteractionList[InteractionIndex] == METEOR_INTERACTION) {
 			//Is meteor interaction
 			//Post meteor interaction
 			NewEvent.EventType = Meteor;
 			PostMeteor_SM(NewEvent);
 			//Increment Interaction Index
 			InteractionIndex++;
-		
 			//Turn on warning LED
 			CrisisLEDState = On;
 			Crisis_Meteor(CrisisLEDState);
-			
+
       CurrentSMState = Playing;
 		}
 		//Otherwise, check if Air leak event
-		else if (InteractionList[InteractionIndex] == 2) {
-      printf("start airleak \r\n");
+		else if (InteractionList[InteractionIndex] == AIRLEAK_INTERACTION) {
 			//Post Air leak event
 			NewEvent.EventType = Leak_Develops;
 			PostAirLeak_SM(NewEvent);
@@ -299,11 +297,11 @@ ES_Event_t RunArcadeFSM( ES_Event_t ThisEvent )
 			CrisisLEDState = On;
 			Crisis_AirLeak(CrisisLEDState);
       CurrentSMState = Playing;
-      
+
       //Init buzzer & timer
       BuzzerState = On;
       Crisis_Buzzer(BuzzerState);
-			ES_Timer_InitTimer(BUZZER_TIMER, 1000);
+			ES_Timer_InitTimer(BUZZER_TIMER, BUZZER_TIME);
 		}
 		//Return Error
 		else  {
@@ -317,6 +315,7 @@ ES_Event_t RunArcadeFSM( ES_Event_t ThisEvent )
 		InteractionIndex = 0;
     ES_Timer_InitTimer(INTERACTION_TIMER, TOT_TIME);
     BuzzerState = Off;
+    //Release Tot
     TOT_Release();
 		Crisis_Buzzer(BuzzerState);
 		CurrentSMState = WaitForTotRelease;
@@ -342,10 +341,10 @@ ES_Event_t RunArcadeFSM( ES_Event_t ThisEvent )
     CurrentSMState = WaitForTotRelease;
 	}
   break;
-  
-    case WaitForTotRelease: 
+
+    case WaitForTotRelease:
 	//If TOT is inserted
-	if (ThisEvent.EventType == ES_TIMEOUT) 
+	if (ThisEvent.EventType == ES_TIMEOUT)
     {
       //Block the TOT channel
       TOT_Block();
@@ -359,18 +358,25 @@ ES_Event_t RunArcadeFSM( ES_Event_t ThisEvent )
     }
 	break;
   }
- 
+
   return ReturnEvent;
 }
 /***************************************************************************
  service event checking functions
  ***************************************************************************/
+ /***
+TotChecker Function Description
+ 	Arguments: none
+ 	Returns: bool. True if ther is a new event
+ 	This function check for the insertion of the tot
 
+ 	Author: Trey Weber
+ ***/
 
 bool TotChecker(void) {
   ES_Event_t NewEvent;
   bool ReturnVal = false;
-  
+
   //Get current TOT state
   uint8_t CurrentTotState = TOT_Detect();
   //Report change only if we aren't playing
@@ -381,7 +387,7 @@ bool TotChecker(void) {
       if (CurrentTotState != 1) {
         //Tot detected, let all these damn services know!
         NewEvent.EventType = Tot_Inserted;
-        ES_PostAll(NewEvent);  
+        ES_PostAll(NewEvent);
           }
       //Else TOT has been ejected into outer space
       //Do Nothing!
@@ -390,7 +396,7 @@ bool TotChecker(void) {
 }
   //Set new state
   LastTotState = CurrentTotState;
-  
+
   //Return
   return ReturnVal;
 }
@@ -400,4 +406,3 @@ bool TotChecker(void) {
 
 /*------------------------------- Footnotes -------------------------------*/
 /*------------------------------ End of file ------------------------------*/
-

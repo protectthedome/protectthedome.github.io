@@ -22,10 +22,10 @@
 <span class="hl com"> When           Who     What/Why</span>
 <span class="hl com"> -------------- ---     --------</span>
 <span class="hl com"> 11/7/19 22:24 ram     initial release</span>
-<span class="hl com"> </span>
+<span class="hl com"></span>
 <span class="hl com">****************************************************************************/</span>
 
-<span class="hl slc">// the common headers for C99 types </span>
+<span class="hl slc">// the common headers for C99 types</span>
 <span class="hl ppc">#include &lt;stdint.h&gt;</span>
 <span class="hl ppc">#include &lt;stdbool.h&gt;</span>
 <span class="hl ppc">#include</span> <span class="hl pps">&quot;termio.h&quot;</span><span class="hl ppc"></span>
@@ -48,9 +48,9 @@
 
 <span class="hl com">/***</span>
 <span class="hl com">Meteor_HWInit Function Description</span>
-<span class="hl com">	Arugments: None</span>
+<span class="hl com">	Arguments: None</span>
 <span class="hl com">	Returns: None</span>
-<span class="hl com">	Call the SR24 init function to intialize hardware to communicate with the </span>
+<span class="hl com">	Call the SR24 init function to intialize hardware to communicate with the</span>
 <span class="hl com">	cascaded registers</span>
 <span class="hl com">***/</span>
 <span class="hl kwb">void</span> <span class="hl kwd">Meteor_HWInit</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
@@ -63,17 +63,17 @@
 
 <span class="hl com">/***</span>
 <span class="hl com">Meteor_LightLEDBank Function Description</span>
-<span class="hl com">	Arugments: BankNum, LEDNum</span>
+<span class="hl com">	Arguments: BankNum, LEDNum</span>
 <span class="hl com">		BankNum: the bank to work with</span>
 <span class="hl com">		LEDNum: LED in the bank wished to light, 0 means all off</span>
 <span class="hl com">	Returns: Status</span>
 <span class="hl com">		If State = false, invalid parameters where given</span>
-<span class="hl com">	Figures out what value to write to SR24 to get the right LED lit. Will use </span>
+<span class="hl com">	Figures out what value to write to SR24 to get the right LED lit. Will use</span>
 <span class="hl com">	masks to preserve the lighting on any other trace</span>
 <span class="hl com">***/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> BankNum<span class="hl opt">,</span> <span class="hl kwb">uint8_t</span> LEDNum<span class="hl opt">)</span>
 <span class="hl opt">{</span>
-	<span class="hl slc">//Set return val to false as defualt</span>
+	<span class="hl slc">//Set return val to false as default</span>
 	<span class="hl kwb">bool</span> ReturnVal <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
 	<span class="hl slc">//If LEDNum &gt; 8 and Bank num  &gt; 2</span>
 	<span class="hl kwa">if</span><span class="hl opt">((</span>LEDNum<span class="hl opt">&gt;</span><span class="hl num">8</span><span class="hl opt">)||(</span>BankNum<span class="hl opt">&gt;</span><span class="hl num">2</span><span class="hl opt">))</span>
@@ -112,10 +112,10 @@
 		<span class="hl slc">//Shift the 1 left by banknum*8+LEDnum</span>
 		<span class="hl kwb">uint8_t</span> shiftval<span class="hl opt">;</span>
 		shiftval <span class="hl opt">= (</span>BankNum<span class="hl opt">*</span><span class="hl num">8</span><span class="hl opt">)+</span>LEDNum<span class="hl opt">-</span><span class="hl num">1</span><span class="hl opt">;</span>
-		LEDValue <span class="hl opt">=</span> LEDValue <span class="hl opt">&lt;&lt;</span> shiftval<span class="hl opt">;</span> 
+		LEDValue <span class="hl opt">=</span> LEDValue <span class="hl opt">&lt;&lt;</span> shiftval<span class="hl opt">;</span>
 		<span class="hl slc">//OR with masked register value</span>
 		NewSR24Value <span class="hl opt">|=</span> LEDValue<span class="hl opt">;</span>
-		
+
 	<span class="hl opt">}</span>
 	<span class="hl slc">//end if	//call SR24_write to write value to shift register</span>
 	<span class="hl kwd">SR24_Write</span><span class="hl opt">(</span>NewSR24Value<span class="hl opt">);</span>
@@ -125,7 +125,7 @@
 
 <span class="hl com">/***</span>
 <span class="hl com">Meteor_ClearAll Function Description</span>
-<span class="hl com">	Arugments: None</span>
+<span class="hl com">	Arguments: None</span>
 <span class="hl com">	Returns: None</span>
 <span class="hl com">	Calls clear bank for each bank</span>
 <span class="hl com">***/</span>

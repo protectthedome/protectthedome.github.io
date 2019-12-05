@@ -40,8 +40,15 @@
 <span class="hl ppc">#define WIN_DELAY 200</span>
 <span class="hl ppc">#define LOSE_DELAY 100</span>
 <span class="hl ppc">#define LED_MOD 5</span>
-<span class="hl ppc">#define MAX( a, b ) ( ( a &gt; b) ? a : b )</span> <span class="hl slc">// this might be poor practice...</span>
-<span class="hl ppc"></span><span class="hl ppc">#define OFF_DELAY 500</span>
+<span class="hl ppc">#define MAX( a, b ) ( ( a &gt; b) ? a : b )</span>
+<span class="hl ppc">#define OFF_DELAY 500</span>
+
+<span class="hl ppc">#define TOTAL_NUMBER_LED 8</span> <span class="hl slc">//total number of LED per bank (8)</span>
+<span class="hl ppc"></span><span class="hl ppc">#define LAST_LED TOTAL_NUMBER_LED</span> <span class="hl slc">//last LED is number 8, closer to the dome</span>
+<span class="hl ppc"></span><span class="hl ppc">#define FIRST_LED_BANK 0</span>
+<span class="hl ppc">#define MIDDLE_LED_BANK 1</span>
+<span class="hl ppc">#define LAST_LED_BANK 2</span>
+<span class="hl ppc">#define CANNON_CENTER_POS 50</span>
 
 <span class="hl com">/*---------------------------- Module Functions ---------------------------*/</span>
 <span class="hl com">/* prototypes for private functions for this machine.They should be functions</span>
@@ -85,7 +92,7 @@
 <span class="hl com">     other required initialization for this state machine</span>
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
-<span class="hl com"></span>
+<span class="hl com">Author: Rachel Thomasson</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">InitEndGameFSM</span><span class="hl opt">(</span><span class="hl kwb">uint8_t</span> Priority<span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -119,7 +126,7 @@
 <span class="hl com"> Description</span>
 <span class="hl com">     Posts an event to this state machine&#39;s queue</span>
 <span class="hl com"> Notes</span>
-<span class="hl com"></span>
+<span class="hl com">Author: Rachel Thomasson</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">PostEndGameFSM</span><span class="hl opt">(</span>ES_Event_t ThisEvent<span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -131,16 +138,17 @@
 <span class="hl com">    RunEndGameFSM</span>
 <span class="hl com"></span>
 <span class="hl com"> Parameters</span>
-<span class="hl com">   ES_Event_t : the event to process</span>
+<span class="hl com">   ES_Event_t : ES_INIT, End_Of_Game, ES_TIMEOUT, Tot_Inserted</span>
 <span class="hl com"></span>
 <span class="hl com"> Returns</span>
 <span class="hl com">   ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise</span>
 <span class="hl com"></span>
 <span class="hl com"> Description</span>
-<span class="hl com">   add your description here</span>
-<span class="hl com"> Notes</span>
-<span class="hl com">   uses nested switch/case to implement the machine.</span>
+<span class="hl com">   Control events during End_Of_Game.</span>
+<span class="hl com">   Different LED pattern and actions for GAME_OVER and Win.</span>
 <span class="hl com"></span>
+<span class="hl com"></span>
+<span class="hl com">Author: Rachel Thomasson</span>
 <span class="hl com">****************************************************************************/</span>
 ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span>ES_Event_t ThisEvent<span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -170,13 +178,10 @@ ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span
           <span class="hl opt">{</span>
             <span class="hl slc">// Start timer</span>
             <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> WIN_DELAY<span class="hl opt">);</span>
-            <span class="hl slc">// return TOT</span>
-            <span class="hl kwd">TOT_Release</span><span class="hl opt">();</span>
-            <span class="hl kwd">Crisis_Buzzer</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
             <span class="hl slc">// initialize counter to number of LEDs (8)</span>
-            counter <span class="hl opt">=</span> <span class="hl num">8</span><span class="hl opt">;</span>
+            counter <span class="hl opt">=</span> TOTAL_NUMBER_LED<span class="hl opt">;</span>
             <span class="hl slc">// initialize position to 0</span>
-            position <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
+            position <span class="hl opt">=</span> FIRST_LED_BANK<span class="hl opt">;</span>
             <span class="hl slc">// move cannon to the first position</span>
             <span class="hl kwd">Cannon_MoveToBank</span><span class="hl opt">(</span>position<span class="hl opt">);</span>
             <span class="hl slc">// set current state to HappyDance</span>
@@ -187,12 +192,9 @@ ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span
           <span class="hl opt">{</span>
             <span class="hl slc">// start timer</span>
             <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> LOSE_DELAY<span class="hl opt">);</span>
-            <span class="hl slc">// return TOT</span>
-            <span class="hl kwd">TOT_Release</span><span class="hl opt">();</span>
-            <span class="hl kwd">Crisis_Buzzer</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
             <span class="hl slc">// determine how far from upright the cannon currently is</span>
             <span class="hl kwb">int8_t</span> CannonPosFromUp<span class="hl opt">;</span>
-            CannonPosFromUp <span class="hl opt">= (</span><span class="hl num">50</span> <span class="hl opt">-</span> <span class="hl kwd">QueryCannonPosition</span><span class="hl opt">());</span>
+            CannonPosFromUp <span class="hl opt">= (</span>CANNON_CENTER_POS <span class="hl opt">-</span> <span class="hl kwd">QueryCannonPosition</span><span class="hl opt">());</span>
             <span class="hl slc">// decide which way cannon should fall</span>
             <span class="hl kwa">if</span> <span class="hl opt">(</span>CannonPosFromUp <span class="hl opt">&gt;</span> <span class="hl num">0</span><span class="hl opt">)</span>
             <span class="hl opt">{</span>
@@ -229,7 +231,7 @@ ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span
         <span class="hl opt">{</span>
           <span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">&gt;</span> <span class="hl num">0</span><span class="hl opt">)</span>
           <span class="hl opt">{</span>
-            <span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">==</span> <span class="hl num">8</span><span class="hl opt">)</span>
+            <span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">==</span> TOTAL_NUMBER_LED<span class="hl opt">)</span>
             <span class="hl opt">{</span>
               <span class="hl slc">// light up cannon LED</span>
               <span class="hl kwd">Cannon_LED</span><span class="hl opt">(</span>On<span class="hl opt">);</span>
@@ -244,15 +246,15 @@ ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span
             <span class="hl slc">// init timer</span>
             <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> WIN_DELAY<span class="hl opt">);</span>
           <span class="hl opt">}</span>
-          <span class="hl kwa">else if</span> <span class="hl opt">( (</span>counter <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl opt">) &amp;&amp; (</span>position <span class="hl opt">&lt;</span> <span class="hl num">3</span><span class="hl opt">) )</span>
+          <span class="hl kwa">else if</span> <span class="hl opt">( (</span>counter <span class="hl opt">==</span> <span class="hl num">0</span><span class="hl opt">) &amp;&amp; (</span>position <span class="hl opt">&lt; (</span>LAST_LED_BANK<span class="hl opt">+</span><span class="hl num">1</span><span class="hl opt">)) )</span>
           <span class="hl opt">{</span>
             <span class="hl slc">// increment position</span>
             position <span class="hl opt">=</span> position <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">;</span>
             <span class="hl slc">// move cannon to next position</span>
             <span class="hl kwd">Cannon_MoveToBank</span><span class="hl opt">(</span>position<span class="hl opt">);</span>
             <span class="hl slc">// reset counter</span>
-            counter <span class="hl opt">=</span> <span class="hl num">8</span><span class="hl opt">;</span>
-            <span class="hl kwa">if</span> <span class="hl opt">(</span>position <span class="hl opt">==</span> <span class="hl num">3</span><span class="hl opt">)</span>
+            counter <span class="hl opt">=</span> TOTAL_NUMBER_LED<span class="hl opt">;</span>
+            <span class="hl kwa">if</span> <span class="hl opt">(</span>position <span class="hl opt">== (</span>LAST_LED_BANK<span class="hl opt">+</span><span class="hl num">1</span><span class="hl opt">))</span>
             <span class="hl opt">{</span>
                 <span class="hl slc">// turn off all LEDs</span>
                 <span class="hl kwd">Meteor_ClearAll</span><span class="hl opt">();</span>
@@ -262,13 +264,13 @@ ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span
                 <span class="hl slc">// wait a hot sec</span>
                 <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> OFF_DELAY<span class="hl opt">);</span> <span class="hl slc">//I changed off_delay to zero for testing. It possibly may be interfering with existing timer?</span>
             <span class="hl opt">}</span>
-            <span class="hl kwa">else</span> 
+            <span class="hl kwa">else</span>
             <span class="hl opt">{</span>
                 <span class="hl slc">// init timer</span>
                 <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> WIN_DELAY<span class="hl opt">);</span>
             <span class="hl opt">}</span>
           <span class="hl opt">}</span>
-          <span class="hl kwa">else if</span> <span class="hl opt">(</span>position <span class="hl opt">==</span> <span class="hl num">3</span><span class="hl opt">)</span>
+          <span class="hl kwa">else if</span> <span class="hl opt">(</span>position <span class="hl opt">== (</span>LAST_LED_BANK<span class="hl opt">+</span><span class="hl num">1</span><span class="hl opt">))</span>
           <span class="hl opt">{</span>
             <span class="hl slc">// post Go_Welcome_Mode to WelcomeFSM</span>
             ES_Event_t NextEvent<span class="hl opt">;</span>
@@ -297,7 +299,7 @@ ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span
     <span class="hl kwa">break</span><span class="hl opt">;</span>
 
     <span class="hl kwa">case</span> SadDance<span class="hl opt">:</span>
-    <span class="hl opt">{</span>      
+    <span class="hl opt">{</span>
       <span class="hl kwa">switch</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType<span class="hl opt">)</span>
       <span class="hl opt">{</span>
         <span class="hl kwa">case</span> ES_TIMEOUT<span class="hl opt">:</span>
@@ -329,20 +331,18 @@ ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span
             <span class="hl opt">}</span>
             <span class="hl slc">// move gauges down</span>
             <span class="hl kwd">AirLeak_MoveGauge</span><span class="hl opt">(</span><span class="hl kwd">AirLeak_QueryGauge</span><span class="hl opt">() -</span> <span class="hl num">1</span><span class="hl opt">);</span>
-            <span class="hl kwd">PowerLib_MoveGauge</span><span class="hl opt">(</span><span class="hl kwd">PowerLib_QueryGauge</span><span class="hl opt">() -</span> <span class="hl num">1</span><span class="hl opt">);</span> 
+            <span class="hl kwd">PowerLib_MoveGauge</span><span class="hl opt">(</span><span class="hl kwd">PowerLib_QueryGauge</span><span class="hl opt">() -</span> <span class="hl num">1</span><span class="hl opt">);</span>
 
             <span class="hl kwa">if</span> <span class="hl opt">(</span>ToggleOn<span class="hl opt">)</span>
             <span class="hl opt">{</span>
               <span class="hl slc">// toggle LEDs touching the dome</span>
-              <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">,</span> <span class="hl num">8</span><span class="hl opt">);</span>
-              <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">1</span><span class="hl opt">,</span> <span class="hl num">8</span><span class="hl opt">);</span>
-              <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">2</span><span class="hl opt">,</span> <span class="hl num">8</span><span class="hl opt">);</span>
+              <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>FIRST_LED_BANK<span class="hl opt">,</span> LAST_LED<span class="hl opt">);</span>
+              <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>MIDDLE_LED_BANK<span class="hl opt">,</span> LAST_LED<span class="hl opt">);</span>
+              <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>LAST_LED_BANK<span class="hl opt">,</span> LAST_LED<span class="hl opt">);</span>
               <span class="hl slc">// toggle indicator lights</span>
               <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>On<span class="hl opt">);</span>
               <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>On<span class="hl opt">);</span>
               <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>On<span class="hl opt">);</span>
-              <span class="hl slc">// toggle buzzer</span>
-              <span class="hl slc">//Crisis_Buzzer(On);</span>
               <span class="hl slc">// switch ToggleOn to False</span>
               ToggleOn <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
             <span class="hl opt">}</span>
@@ -354,8 +354,6 @@ ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span
               <span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
               <span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
               <span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>Off<span class="hl opt">);</span>
-              <span class="hl slc">// toggle buzzer</span>
-              <span class="hl slc">//Crisis_Buzzer(Off);</span>
               <span class="hl slc">// switch ToggleOn to True</span>
               ToggleOn <span class="hl opt">=</span> <span class="hl kwa">true</span><span class="hl opt">;</span>
             <span class="hl opt">}</span>
@@ -371,7 +369,7 @@ ES_Event_t <span class="hl kwd">RunEndGameFSM</span><span class="hl opt">(</span
                 <span class="hl slc">// wait a hot sec</span>
                 <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> OFF_DELAY<span class="hl opt">);</span>
             <span class="hl opt">}</span>
-            <span class="hl kwa">else</span> 
+            <span class="hl kwa">else</span>
             <span class="hl opt">{</span>
                 <span class="hl slc">// init timer</span>
                 <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>ENDOFGAME_TIMER<span class="hl opt">,</span> LOSE_DELAY<span class="hl opt">);</span>

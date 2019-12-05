@@ -43,6 +43,7 @@
 #define HALF_SEC (ONE_SEC/2)
 #define TWO_SEC (ONE_SEC*2)
 #define FIVE_SEC (ONE_SEC*5)
+#define RESET_TIME (30*ONE_SEC)
 
 /*---------------------------- Module Functions ---------------------------*/
 /* prototypes for private functions for this service.They should be functions
@@ -70,17 +71,17 @@ static ES_Event_t DeferralQueue[3+1];
      bool, false if error in initialization, true otherwise
 
  Description
-     Saves away the priority, and does any 
+     Saves away the priority, and does any
      other required initialization for this service
  Notes
 
  Author
-     J. Edward Carryer, 01/16/12, 10:00
+     Trey Weber
 ****************************************************************************/
 bool InitResetService ( uint8_t Priority )
 {
   MyPriority = Priority;
-  
+
   return true;
 }
 
@@ -102,7 +103,7 @@ bool InitResetService ( uint8_t Priority )
  Notes
 
  Author
-     J. Edward Carryer, 10/23/11, 19:25
+     Trey Weber
 ****************************************************************************/
 bool PostResetService( ES_Event_t ThisEvent )
 {
@@ -114,69 +115,63 @@ bool PostResetService( ES_Event_t ThisEvent )
     RunResetService
 
  Parameters
-   ES_Event_t : the event to process
+   ES_Event_t : Tot_Inserted, New_Pot_Value, Airflow_Plugged, Falling_Edge,
+   Rising_Edge, Cannon_Button_Down, ES_TIMEOUT, End_Of_Game
 
  Returns
    ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise
 
  Description
-   add your description here
+    Monitors for user interactions with device
  Notes
-   
+
  Author
-   J. Edward Carryer, 01/15/12, 15:23
+   Trey Weber
 ****************************************************************************/
 ES_Event_t RunResetService( ES_Event_t ThisEvent )
 {
   ES_Event_t NewEvent;
   ES_Event_t ReturnEvent;
   ReturnEvent.EventType = ES_NO_EVENT;
-  
+
   switch (ThisEvent.EventType) {
     case Tot_Inserted:
 		//Init new 30s timer
-		ES_Timer_InitTimer(RESET_TIMER, 30000);
-    printf("\rTOT Inserted");
+		ES_Timer_InitTimer(RESET_TIMER, RESET_TIME);
 	break;
-    case New_Pot_Value: 
+    case New_Pot_Value:
 		//Init new 30s timer
-		ES_Timer_InitTimer(RESET_TIMER, 30000);
-    printf("\rNewPotValue\r\n");
+		ES_Timer_InitTimer(RESET_TIMER, RESET_TIME);
     break;
     case Airflow_Plugged:
 		//Init new 30s timer
-		ES_Timer_InitTimer(RESET_TIMER, 30000);
-    printf("\rAirPlugged\r\n");
+		ES_Timer_InitTimer(RESET_TIMER, RESET_TIME);
     break;
 	case Falling_Edge:
 		//Init new 30s timer
-		ES_Timer_InitTimer(RESET_TIMER, 30000);
-  printf("\rFalling Edge\r\n");
+		ES_Timer_InitTimer(RESET_TIMER, RESET_TIME);
 	break;
 	case Rising_Edge:
 		//Init new 30s timer
-		ES_Timer_InitTimer(RESET_TIMER, 30000);
-  printf("\rRising Edge\r\n");
+		ES_Timer_InitTimer(RESET_TIMER, RESET_TIME);
 	break;
 	case Cannon_Button_Down:
 		//Init new 30s timer;
-		ES_Timer_InitTimer(RESET_TIMER, 30000);
+		ES_Timer_InitTimer(RESET_TIMER, RESET_TIME);
 	break;
 	case ES_TIMEOUT:
-    printf("\rRESET\r\n");
 		//Post reset event to all
 		NewEvent.EventType = RST;
 		ES_PostAll(NewEvent);
 		//Post go welcome mode event to Welcome_SM
 		NewEvent.EventType = Go_Welcome_Mode;
 		PostWelcomeFSM(NewEvent);
-    //TOT_Release();
 	break;
   case End_Of_Game:
     ES_Timer_StopTimer(RESET_TIMER);
   break;
   }
- 
+
   return ReturnEvent;
 }
 
@@ -185,7 +180,6 @@ ES_Event_t RunResetService( ES_Event_t ThisEvent )
  ***************************************************************************/
 
 
- 
+
 /*------------------------------- Footnotes -------------------------------*/
 /*------------------------------ End of file ------------------------------*/
-

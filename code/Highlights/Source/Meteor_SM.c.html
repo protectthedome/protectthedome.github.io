@@ -100,8 +100,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 01/16/12, 10:00</span>
-<span class="hl com">****************************************************************************/</span>
+<span class="hl com">	Trey Weber     ****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">InitMeteor_SM</span> <span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
 <span class="hl opt">{</span>
   MyPriority <span class="hl opt">=</span> Priority<span class="hl opt">;</span>
@@ -134,7 +133,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 10/23/11, 19:25</span>
+<span class="hl com">     Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">PostMeteor_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -156,7 +155,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com">   </span>
 <span class="hl com"> Author</span>
-<span class="hl com">   J. Edward Carryer, 01/15/12, 15:23</span>
+<span class="hl com">   Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 ES_Event_t <span class="hl kwd">RunMeteor_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -170,7 +169,6 @@ ES_Event_t <span class="hl kwd">RunMeteor_SM</span><span class="hl opt">(</span>
 	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Meteor<span class="hl opt">) {</span>
 		<span class="hl slc">//Reset count</span>
 		counter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
-    
 		<span class="hl slc">//Init timer</span>
 		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>METEOR_TIMER<span class="hl opt">,</span> FALL_TIME<span class="hl opt">);</span>
 		<span class="hl slc">//Get &quot;random&quot; number</span>
@@ -183,20 +181,17 @@ ES_Event_t <span class="hl kwd">RunMeteor_SM</span><span class="hl opt">(</span>
     <span class="hl opt">{</span>
       BankNum <span class="hl opt">=</span> <span class="hl kwd">RandomNext</span><span class="hl opt">();</span>
     <span class="hl opt">}</span>
-    <span class="hl slc">//printf(&quot;\rBankNum: %u\r\n&quot;, BankNum);</span>
 		<span class="hl slc">//Turn on top LED of bank</span>
 		<span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>BankNum<span class="hl opt">,</span> counter <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">);</span>
 		<span class="hl slc">//Update current state</span>
 		CurrentSMState <span class="hl opt">=</span> MeteorFalling<span class="hl opt">;</span>
     <span class="hl slc">//Increment Machine counter</span>
-    <span class="hl slc">//printf(&quot;\rMeteor MachineCounter: %u\r\n&quot;, MachineCounter);</span>
     MachineCounter<span class="hl opt">++;</span>
     
 	<span class="hl opt">}</span>
   <span class="hl kwa">else if</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> End_Of_Game <span class="hl opt">||</span> ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> RST<span class="hl opt">)</span>
   <span class="hl opt">{</span>
     MachineCounter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
-    <span class="hl slc">//printf(&quot;\rMeteor MachineCounter: %u\r\n&quot;, MachineCounter);</span>
   <span class="hl opt">}</span>
     <span class="hl kwa">break</span><span class="hl opt">;</span>
 	<span class="hl kwa">case</span> MeteorFalling<span class="hl opt">:</span>
@@ -221,7 +216,6 @@ ES_Event_t <span class="hl kwd">RunMeteor_SM</span><span class="hl opt">(</span>
 			<span class="hl slc">//Post meteor destroyed to Meteor SM and cannon SM</span>
 		  ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Meteor_Destroyed<span class="hl opt">;</span>
       <span class="hl kwd">PostCannon_SM</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">);</span>
-      <span class="hl slc">//printf(&quot;\rI posted!\r\n&quot;);</span>
       <span class="hl kwd">PostMeteor_SM</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">);</span>
 		<span class="hl opt">}</span>
 	<span class="hl opt">}</span>
@@ -234,7 +228,6 @@ ES_Event_t <span class="hl kwd">RunMeteor_SM</span><span class="hl opt">(</span>
 		<span class="hl slc">//Decrement LED</span>
 		<span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span>BankNum<span class="hl opt">,</span> counter <span class="hl opt">+</span> <span class="hl num">1</span><span class="hl opt">);</span>
 		<span class="hl slc">//Init timer</span>
-    <span class="hl slc">//printf(&quot;\rFall Time: %i\r\n&quot;, FALL_TIME);</span>
 		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>METEOR_TIMER<span class="hl opt">,</span> FALL_TIME<span class="hl opt">);</span>
 		<span class="hl opt">}</span>
 		<span class="hl slc">//else we have reached max count</span>
@@ -272,9 +265,7 @@ ES_Event_t <span class="hl kwd">RunMeteor_SM</span><span class="hl opt">(</span>
 	<span class="hl kwa">break</span><span class="hl opt">;</span>
   <span class="hl kwa">case</span> MeteorFlashing<span class="hl opt">:</span>
     <span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">) {</span>
-      <span class="hl slc">//printf(&quot;meteor timeout&quot;);</span>
       <span class="hl kwa">if</span> <span class="hl opt">(</span>blinkcount <span class="hl opt">&lt;=</span> BLINK_COUNT_MAX<span class="hl opt">) {</span>
-        <span class="hl slc">//printf(&quot;1\r\n&quot;);</span>
         <span class="hl slc">//we are still flashing</span>
         <span class="hl kwa">if</span> <span class="hl opt">((</span>blinkcount <span class="hl opt">%</span> <span class="hl num">2</span><span class="hl opt">) ==</span> <span class="hl num">0</span><span class="hl opt">) {</span>
           <span class="hl slc">//turn off</span>
@@ -288,7 +279,6 @@ ES_Event_t <span class="hl kwd">RunMeteor_SM</span><span class="hl opt">(</span>
         <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>METEOR_TIMER<span class="hl opt">,</span> DESTROYED_DELAY<span class="hl opt">);</span>
       <span class="hl opt">}</span>
       <span class="hl kwa">else</span> <span class="hl opt">{</span>
-         <span class="hl slc">//printf(&quot;2&quot;);</span>
         <span class="hl slc">//we are done flashing</span>
         <span class="hl slc">//Reset counter</span>
         counter <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
@@ -311,6 +301,15 @@ ES_Event_t <span class="hl kwd">RunMeteor_SM</span><span class="hl opt">(</span>
 <span class="hl com">/***************************************************************************</span>
 <span class="hl com"> private functions</span>
 <span class="hl com"> ***************************************************************************/</span>
+ <span class="hl com">/***</span>
+<span class="hl com">RandomNext Function Description</span>
+<span class="hl com"> 	Arguments: none</span>
+<span class="hl com"> 	Returns: uint8_t, random number</span>
+<span class="hl com"> 	This function generates a pseudorandom number</span>
+<span class="hl com"></span>
+<span class="hl com"> 	Author: Riyaz Merchant</span>
+<span class="hl com"> ***/</span>
+
 
 <span class="hl kwb">static uint8_t</span> <span class="hl kwd">RandomNext</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">)</span>
 <span class="hl opt">{</span>

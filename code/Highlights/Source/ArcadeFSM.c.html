@@ -34,9 +34,6 @@
 <span class="hl ppc">#include</span> <span class="hl pps">&quot;Meteor.h&quot;</span><span class="hl ppc"></span>
 
 
-<span class="hl slc">//Will need lots of includes as we finish modules!</span>
-
-
 <span class="hl com">/* include header files for hardware access</span>
 <span class="hl com">*/</span>
 <span class="hl ppc">#include</span> <span class="hl pps">&quot;inc/hw_memmap.h&quot;</span><span class="hl ppc"></span>
@@ -68,6 +65,12 @@
 
 <span class="hl ppc">#define TOT_TIME 2000</span> <span class="hl slc">//changed from 2000</span>
 <span class="hl ppc"></span>
+<span class="hl ppc">#define AIRLEAK_INTERACTION 2</span>
+<span class="hl ppc">#define METEOR_INTERACTION 3</span>
+
+<span class="hl ppc">#define   TIME_BTW_INTERACTIONS (2.5*ONE_SEC)</span>
+<span class="hl ppc">#define BUZZER_TIME (ONE_SEC)</span>
+
 <span class="hl com">/*---------------------------- Module Functions ---------------------------*/</span>
 <span class="hl com">/* prototypes for private functions for this service.They should be functions</span>
 <span class="hl com">   relevant to the behavior of this service</span>
@@ -75,7 +78,7 @@
 
 <span class="hl kwb">bool</span> <span class="hl kwd">TotChecker</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">);</span>
 
-<span class="hl slc">//ADD CODE DISTINGUISHING TIMEOUTS</span>
+
 
 <span class="hl com">/*---------------------------- Module Variables ---------------------------*/</span>
 <span class="hl slc">// with the introduction of Gen2, we need a module level Priority variable</span>
@@ -83,14 +86,15 @@
 <span class="hl kwb">static</span> ArcadeFSMState_t CurrentSMState<span class="hl opt">;</span>
 UI_State_t CrisisLEDState<span class="hl opt">;</span>
 
-<span class="hl slc">//2 denotes power regen, 3 denotes meteor.</span>
-<span class="hl kwb">static const uint8_t</span> InteractionList<span class="hl opt">[</span>NUM_INTERACTIONS<span class="hl opt">] = {</span><span class="hl num">3</span><span class="hl opt">,</span><span class="hl num">3</span><span class="hl opt">,</span><span class="hl num">2</span><span class="hl opt">,</span><span class="hl num">3</span><span class="hl opt">,</span><span class="hl num">3</span><span class="hl opt">,</span><span class="hl num">2</span><span class="hl opt">,</span><span class="hl num">3</span><span class="hl opt">,</span><span class="hl num">3</span><span class="hl opt">};</span>
+
+<span class="hl kwb">static const uint8_t</span> InteractionList<span class="hl opt">[</span>NUM_INTERACTIONS<span class="hl opt">] = {</span>METEOR_INTERACTION<span class="hl opt">,</span>
+  METEOR_INTERACTION<span class="hl opt">,</span>AIRLEAK_INTERACTION<span class="hl opt">,</span>METEOR_INTERACTION<span class="hl opt">,</span>METEOR_INTERACTION<span class="hl opt">,</span>
+  AIRLEAK_INTERACTION<span class="hl opt">,</span>METEOR_INTERACTION<span class="hl opt">,</span>METEOR_INTERACTION<span class="hl opt">};</span>
 
 <span class="hl slc">//Track index of InteractionList</span>
 <span class="hl kwb">static uint8_t</span> InteractionIndex <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
 UI_State_t BuzzerState<span class="hl opt">;</span>
 <span class="hl kwb">static uint8_t</span> LastTotState <span class="hl opt">=</span> <span class="hl num">1</span><span class="hl opt">;</span>
-
 
 
 <span class="hl slc">// add a deferral queue for up to 3 pending deferrals +1 to allow for overhead</span>
@@ -108,35 +112,32 @@ UI_State_t BuzzerState<span class="hl opt">;</span>
 <span class="hl com">     bool, false if error in initialization, true otherwise</span>
 <span class="hl com"></span>
 <span class="hl com"> Description</span>
-<span class="hl com">     Saves away the priority, and does any </span>
+<span class="hl com">     Saves away the priority, and does any</span>
 <span class="hl com">     other required initialization for this service</span>
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 01/16/12, 10:00</span>
+<span class="hl com">     Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">InitArcadeFSM</span> <span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
 <span class="hl opt">{</span>
   MyPriority <span class="hl opt">=</span> Priority<span class="hl opt">;</span>
- 
-  <span class="hl slc">//Does any hardware need to be initialized? </span>
-  <span class="hl slc">//Servo_HWInit();</span>
-  
+
   <span class="hl slc">//Initialize TOT</span>
   <span class="hl kwd">TOT_HWInit</span><span class="hl opt">();</span>
   <span class="hl kwd">TOT_Block</span><span class="hl opt">();</span>
-  
+
   <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">,</span> <span class="hl num">0</span><span class="hl opt">);</span>
 
   <span class="hl slc">//Intialzie Deferral Queue</span>
   <span class="hl kwd">ES_InitDeferralQueueWith</span><span class="hl opt">(</span>DeferralQueue<span class="hl opt">,</span> <span class="hl kwd">ARRAY_SIZE</span><span class="hl opt">(</span>DeferralQueue<span class="hl opt">));</span>
-  
+
   <span class="hl slc">//Initialize AirLeak HW (includes crisis LEDs)</span>
   <span class="hl kwd">AirLeak_Init</span><span class="hl opt">();</span>
-  
+
   <span class="hl slc">//Set SM currentstate</span>
   CurrentSMState <span class="hl opt">=</span> NotPlaying<span class="hl opt">;</span>
- 
+
   <span class="hl kwa">return true</span><span class="hl opt">;</span>
 <span class="hl opt">}</span>
 
@@ -158,7 +159,7 @@ UI_State_t BuzzerState<span class="hl opt">;</span>
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 10/23/11, 19:25</span>
+<span class="hl com">     Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">PostArcadeFSM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -170,26 +171,30 @@ UI_State_t BuzzerState<span class="hl opt">;</span>
 <span class="hl com">    RunArcadeFSM</span>
 <span class="hl com"></span>
 <span class="hl com"> Parameters</span>
-<span class="hl com">   ES_Event_t : the event to process</span>
+<span class="hl com">   ES_Event_t : Tot_Inserted, End_Of_Game, RST, TIME_OUT, Interaction_Completed</span>
+<span class="hl com">   Global_Time_Out</span>
 <span class="hl com"></span>
 <span class="hl com"> Returns</span>
 <span class="hl com">   ES_Event_t, ES_NO_EVENT if no error ES_ERROR otherwise</span>
 <span class="hl com"></span>
 <span class="hl com"> Description</span>
-<span class="hl com">   add your description here</span>
+<span class="hl com">   Controls which is the current active game (power crank, air leak, or meteor)</span>
+<span class="hl com">   Controls the warning LED and BUZZER</span>
+<span class="hl com">   Controls the Release of TOT</span>
+<span class="hl com">   Control End_Of_Game due Global_Time_Out</span>
 <span class="hl com"> Notes</span>
-<span class="hl com">   </span>
+<span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">   </span>
+<span class="hl com">   Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
   ES_Event_t NewEvent<span class="hl opt">;</span>
   ES_Event_t ReturnEvent<span class="hl opt">;</span>
   ReturnEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> ES_NO_EVENT<span class="hl opt">;</span>
-  
+
   <span class="hl kwa">switch</span> <span class="hl opt">(</span>CurrentSMState<span class="hl opt">) {</span>
-    <span class="hl kwa">case</span> NotPlaying<span class="hl opt">:</span> 
+    <span class="hl kwa">case</span> NotPlaying<span class="hl opt">:</span>
 	<span class="hl slc">//If TOT is inserted</span>
 	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Tot_Inserted<span class="hl opt">) {</span>
     <span class="hl kwd">Meteor_LightLEDBank</span><span class="hl opt">(</span><span class="hl num">0</span><span class="hl opt">,</span> <span class="hl num">0</span><span class="hl opt">);</span>
@@ -200,13 +205,10 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
 		CurrentSMState <span class="hl opt">=</span> Playing<span class="hl opt">;</span>
 		<span class="hl slc">//Turn on Crisis LED</span>
 		CrisisLEDState <span class="hl opt">=</span> On<span class="hl opt">;</span>
-		<span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>CrisisLEDState<span class="hl opt">);</span> 
-    <span class="hl slc">//BuzzerState = On;</span>
-    <span class="hl slc">//printf(&quot;Buzz\r\n&quot;);</span>
-	  <span class="hl slc">//Crisis_Buzzer(BuzzerState);</span>
+		<span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>CrisisLEDState<span class="hl opt">);</span>
     <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>INTERACTION_TIMER<span class="hl opt">,</span> DELAY_TIME<span class="hl opt">);</span>
 	<span class="hl opt">}</span>
- 
+
     <span class="hl kwa">break</span><span class="hl opt">;</span>
     <span class="hl kwa">case</span> Playing<span class="hl opt">:</span>
 	<span class="hl slc">//If we get a reset event or end of game</span>
@@ -222,22 +224,21 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
 	<span class="hl slc">//Otherwise if we get a buzzer timeout</span>
 	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">) {</span>
 		<span class="hl slc">//Turn off buzzer</span>
-    <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;BUZZER OFF&quot;</span><span class="hl opt">);</span>
 		BuzzerState <span class="hl opt">=</span> Off<span class="hl opt">;</span>
 		<span class="hl kwd">Crisis_Buzzer</span><span class="hl opt">(</span>BuzzerState<span class="hl opt">);</span>
 		<span class="hl opt">}</span>
-	<span class="hl slc">//Otherwise if an interaction is complete	</span>
+	<span class="hl slc">//Otherwise if an interaction is complete</span>
 	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Interaction_Completed<span class="hl opt">) {</span>
 		<span class="hl slc">//Turn off warning LEDs</span>
 		CrisisLEDState <span class="hl opt">=</span> Off<span class="hl opt">;</span>
-    
+
 		<span class="hl kwd">Crisis_Power</span><span class="hl opt">(</span>CrisisLEDState<span class="hl opt">);</span>
 		<span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>CrisisLEDState<span class="hl opt">);</span>
 		<span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>CrisisLEDState<span class="hl opt">);</span>
 
 		<span class="hl slc">//Initialize timer (few seconds)</span>
-     <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>INTERACTION_TIMER<span class="hl opt">,</span> <span class="hl num">2500</span><span class="hl opt">);</span>
-  
+     <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>INTERACTION_TIMER<span class="hl opt">,</span> TIME_BTW_INTERACTIONS<span class="hl opt">);</span>
+
      CurrentSMState <span class="hl opt">=</span> WaitForNext<span class="hl opt">;</span>
 	<span class="hl opt">}</span>
 	<span class="hl slc">//Otherwise if we get a global timeout</span>
@@ -260,7 +261,7 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
 		<span class="hl opt">}</span>
 	 <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>INTERACTION_TIMER<span class="hl opt">,</span> TOT_TIME<span class="hl opt">);</span>
     CurrentSMState <span class="hl opt">=</span> WaitForTotRelease<span class="hl opt">;</span>
-	<span class="hl opt">}</span>	
+	<span class="hl opt">}</span>
     <span class="hl kwa">break</span><span class="hl opt">;</span>
 	<span class="hl kwa">case</span> WaitForNext<span class="hl opt">:</span>
 	<span class="hl slc">//Check for Timeout</span>
@@ -279,24 +280,21 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
       <span class="hl kwd">TOT_Release</span><span class="hl opt">();</span>
 		<span class="hl opt">}</span>
 			<span class="hl slc">//Check if next event in list is meteor</span>
-		<span class="hl kwa">else if</span> <span class="hl opt">(</span>InteractionList<span class="hl opt">[</span>InteractionIndex<span class="hl opt">] ==</span> <span class="hl num">3</span><span class="hl opt">) {</span>
-      <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Start meteor</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+		<span class="hl kwa">else if</span> <span class="hl opt">(</span>InteractionList<span class="hl opt">[</span>InteractionIndex<span class="hl opt">] ==</span> METEOR_INTERACTION<span class="hl opt">) {</span>
 			<span class="hl slc">//Is meteor interaction</span>
 			<span class="hl slc">//Post meteor interaction</span>
 			NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Meteor<span class="hl opt">;</span>
 			<span class="hl kwd">PostMeteor_SM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
 			<span class="hl slc">//Increment Interaction Index</span>
 			InteractionIndex<span class="hl opt">++;</span>
-		
 			<span class="hl slc">//Turn on warning LED</span>
 			CrisisLEDState <span class="hl opt">=</span> On<span class="hl opt">;</span>
 			<span class="hl kwd">Crisis_Meteor</span><span class="hl opt">(</span>CrisisLEDState<span class="hl opt">);</span>
-			
+
       CurrentSMState <span class="hl opt">=</span> Playing<span class="hl opt">;</span>
 		<span class="hl opt">}</span>
 		<span class="hl slc">//Otherwise, check if Air leak event</span>
-		<span class="hl kwa">else if</span> <span class="hl opt">(</span>InteractionList<span class="hl opt">[</span>InteractionIndex<span class="hl opt">] ==</span> <span class="hl num">2</span><span class="hl opt">) {</span>
-      <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;start airleak</span> <span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
+		<span class="hl kwa">else if</span> <span class="hl opt">(</span>InteractionList<span class="hl opt">[</span>InteractionIndex<span class="hl opt">] ==</span> AIRLEAK_INTERACTION<span class="hl opt">) {</span>
 			<span class="hl slc">//Post Air leak event</span>
 			NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Leak_Develops<span class="hl opt">;</span>
 			<span class="hl kwd">PostAirLeak_SM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
@@ -306,11 +304,11 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
 			CrisisLEDState <span class="hl opt">=</span> On<span class="hl opt">;</span>
 			<span class="hl kwd">Crisis_AirLeak</span><span class="hl opt">(</span>CrisisLEDState<span class="hl opt">);</span>
       CurrentSMState <span class="hl opt">=</span> Playing<span class="hl opt">;</span>
-      
+
       <span class="hl slc">//Init buzzer &amp; timer</span>
       BuzzerState <span class="hl opt">=</span> On<span class="hl opt">;</span>
       <span class="hl kwd">Crisis_Buzzer</span><span class="hl opt">(</span>BuzzerState<span class="hl opt">);</span>
-			<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>BUZZER_TIMER<span class="hl opt">,</span> <span class="hl num">1000</span><span class="hl opt">);</span>
+			<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>BUZZER_TIMER<span class="hl opt">,</span> BUZZER_TIME<span class="hl opt">);</span>
 		<span class="hl opt">}</span>
 		<span class="hl slc">//Return Error</span>
 		<span class="hl kwa">else</span>  <span class="hl opt">{</span>
@@ -324,6 +322,7 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
 		InteractionIndex <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
     <span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>INTERACTION_TIMER<span class="hl opt">,</span> TOT_TIME<span class="hl opt">);</span>
     BuzzerState <span class="hl opt">=</span> Off<span class="hl opt">;</span>
+    <span class="hl slc">//Release Tot</span>
     <span class="hl kwd">TOT_Release</span><span class="hl opt">();</span>
 		<span class="hl kwd">Crisis_Buzzer</span><span class="hl opt">(</span>BuzzerState<span class="hl opt">);</span>
 		CurrentSMState <span class="hl opt">=</span> WaitForTotRelease<span class="hl opt">;</span>
@@ -349,10 +348,10 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
     CurrentSMState <span class="hl opt">=</span> WaitForTotRelease<span class="hl opt">;</span>
 	<span class="hl opt">}</span>
   <span class="hl kwa">break</span><span class="hl opt">;</span>
-  
-    <span class="hl kwa">case</span> WaitForTotRelease<span class="hl opt">:</span> 
+
+    <span class="hl kwa">case</span> WaitForTotRelease<span class="hl opt">:</span>
 	<span class="hl slc">//If TOT is inserted</span>
-	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">)</span> 
+	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">)</span>
     <span class="hl opt">{</span>
       <span class="hl slc">//Block the TOT channel</span>
       <span class="hl kwd">TOT_Block</span><span class="hl opt">();</span>
@@ -366,18 +365,25 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
     <span class="hl opt">}</span>
 	<span class="hl kwa">break</span><span class="hl opt">;</span>
   <span class="hl opt">}</span>
- 
+
   <span class="hl kwa">return</span> ReturnEvent<span class="hl opt">;</span>
 <span class="hl opt">}</span>
 <span class="hl com">/***************************************************************************</span>
 <span class="hl com"> service event checking functions</span>
 <span class="hl com"> ***************************************************************************/</span>
-
+ <span class="hl com">/***</span>
+<span class="hl com">TotChecker Function Description</span>
+<span class="hl com"> 	Arguments: none</span>
+<span class="hl com"> 	Returns: bool. True if ther is a new event</span>
+<span class="hl com"> 	This function check for the insertion of the tot</span>
+<span class="hl com"></span>
+<span class="hl com"> 	Author: Trey Weber</span>
+<span class="hl com"> ***/</span>
 
 <span class="hl kwb">bool</span> <span class="hl kwd">TotChecker</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">) {</span>
   ES_Event_t NewEvent<span class="hl opt">;</span>
   <span class="hl kwb">bool</span> ReturnVal <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
-  
+
   <span class="hl slc">//Get current TOT state</span>
   <span class="hl kwb">uint8_t</span> CurrentTotState <span class="hl opt">=</span> <span class="hl kwd">TOT_Detect</span><span class="hl opt">();</span>
   <span class="hl slc">//Report change only if we aren&#39;t playing</span>
@@ -388,7 +394,7 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
       <span class="hl kwa">if</span> <span class="hl opt">(</span>CurrentTotState <span class="hl opt">!=</span> <span class="hl num">1</span><span class="hl opt">) {</span>
         <span class="hl slc">//Tot detected, let all these damn services know!</span>
         NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Tot_Inserted<span class="hl opt">;</span>
-        <span class="hl kwd">ES_PostAll</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>  
+        <span class="hl kwd">ES_PostAll</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
           <span class="hl opt">}</span>
       <span class="hl slc">//Else TOT has been ejected into outer space</span>
       <span class="hl slc">//Do Nothing!</span>
@@ -397,7 +403,7 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
 <span class="hl opt">}</span>
   <span class="hl slc">//Set new state</span>
   LastTotState <span class="hl opt">=</span> CurrentTotState<span class="hl opt">;</span>
-  
+
   <span class="hl slc">//Return</span>
   <span class="hl kwa">return</span> ReturnVal<span class="hl opt">;</span>
 <span class="hl opt">}</span>
@@ -407,7 +413,6 @@ ES_Event_t <span class="hl kwd">RunArcadeFSM</span><span class="hl opt">(</span>
 
 <span class="hl com">/*------------------------------- Footnotes -------------------------------*/</span>
 <span class="hl com">/*------------------------------ End of file ------------------------------*/</span>
-
 </pre>
 </body>
 </html>

@@ -1,4 +1,4 @@
-//Pseudocode for Meteor_SM.c
+Pseudocode for Meteor_SM.c
 
 InitMeteorSM -
 

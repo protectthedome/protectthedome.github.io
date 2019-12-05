@@ -13,7 +13,8 @@
  History
  When           Who     What/Why
  -------------- ---     --------
- 11/08/19 19:00 gab      pseudo-code
+ 11/08/19 19:00 gab     pseudo-code
+ 11/18/19 16:42 ram		random exclusive function added 
 ****************************************************************************/
 /*----------------------------- Include Files -----------------------------*/
 /* include header files for this service
@@ -76,8 +77,8 @@ static AirLeakState_t CurrentState;
 static uint8_t Fan=3; //Active Fan (0,1,2, initiate to an invalid number)
 static uint8_t HallData[3];//Hall sensors data
 static uint8_t previous_HallData[3];//Hall sensors data
-static uint8_t MachineCounter;
-static uint8_t Indices[] = {0, 1, 2};
+static uint8_t MachineCounter; //Tracks # times service called during a game
+static uint8_t Indices[] = {0, 1, 2}; // List of fans
 
 
 /*------------------------------ Module Code ------------------------------*/
@@ -141,14 +142,14 @@ bool PostAirLeak_SM( ES_Event_t ThisEvent )
 
  Parameters
    ES_Event_t : the event to process. This event will be one of:
-
+   Tot_Inserted, Leak_Develops, End_Of_Game, RST, ES_TIMEOUT, AirflowPlugged
 
 
  Returns
    ES_NO_EVENT
 
  Description
-
+Control game Air Leaks.
 
 
  Notes
@@ -162,14 +163,14 @@ ES_Event_t RunAirLeak_SM( ES_Event_t ThisEvent )
   ES_Event_t NewEvent;
   ReturnEvent.EventType=ES_NO_EVENT;
 
-    switch (CurrentState)
+switch (CurrentState)
 {
-  case Idle_A ://		CurrentState is Idle_A
+  case Idle_A ://CurrentState is Idle_A
   {//if tot inserted
     if (ThisEvent.EventType == Tot_Inserted){
       //set oxygen gauge to max
       AirLeak_MoveGauge(MAX_OXIGEN_LEVEL);
-      //Indices[] equal {0, 1, 2}
+      //Set indices[] equal {0, 1, 2} to reset list
       uint8_t index;
       for(index=0; index <3; index++)
       {
@@ -185,7 +186,6 @@ ES_Event_t RunAirLeak_SM( ES_Event_t ThisEvent )
         //Use system time to randomly select the fan
         SysTime = ES_Timer_GetTime();
         Fan = RandomExclusive(SysTime);
-        //printf("\rFan: %u\r\n", Fan);
         // Turn the fan on
         AirLeak_FanControl(Fan, On);
         //Start timer
@@ -197,7 +197,6 @@ ES_Event_t RunAirLeak_SM( ES_Event_t ThisEvent )
       else if(ThisEvent.EventType == End_Of_Game || ThisEvent.EventType == RST)
       {
         MachineCounter = 0;
-        //printf("\rMachineCounter: %u\r\n", MachineCounter);
       }
      }
 
@@ -242,7 +241,7 @@ ES_Event_t RunAirLeak_SM( ES_Event_t ThisEvent )
       //move to Idle_A state
       CurrentState = Idle_A;
       //set Fan to invalid
-      //Fan=3;
+      Fan=3;
     }//end if
 
     //if RST
@@ -265,7 +264,6 @@ ES_Event_t RunAirLeak_SM( ES_Event_t ThisEvent )
       CurrentState = Idle_A;
       //FanIndex = 0;
       MachineCounter = 0;
-      printf("\rMachineCounter: %u\r\n", MachineCounter);
       //set Fan to invalid
       Fan=3;
     }//end if
@@ -294,6 +292,9 @@ return ReturnEvent;
    bool. True is a new event has been published
 
  Description
+ Check if there is an Air leak active, if the plug is detected by the hall sensor.
+ It also check is any of the plug is inserted or taken off, this count as a user
+ interaction for the ResetService
 
  Notes
 
@@ -309,8 +310,8 @@ Gabriela Bravo, 11//19, 16:00
 
 	 //if active leak plugged, post to Airleak_SM
    if(Fan<3){
-     //printf("checking %u\n\r",HallData[Fan]);
-     if(HallData[Fan]==0 ){
+     if(HallData[Fan]==0 )
+	 {
        //post that air leak was plugged
        ReturnEvent.EventType=Airflow_Plugged;
        PostAirLeak_SM(ReturnEvent);
@@ -322,7 +323,8 @@ Gabriela Bravo, 11//19, 16:00
  }
    //if any of the sensors changed state, count it as a new interaction
    if ((HallData[0]!=previous_HallData[0]) || (HallData[1]!=previous_HallData[1]) ||
-     (HallData[2]!=previous_HallData[2]) ) {
+     (HallData[2]!=previous_HallData[2]) ) 
+	 {
       //post to reset service
      ReturnEvent.EventType=Airflow_Plugged;
      PostResetService(ReturnEvent);
@@ -343,10 +345,10 @@ Gabriela Bravo, 11//19, 16:00
    None
 
  Returns
-   Fucntion that copy array with halldata info to Previous_HallData
+   None
 
  Description
-
+Function to copy from the array HallData to the array previous_HallData
  Notes
 
  Author
@@ -376,7 +378,6 @@ static uint8_t RandomExclusive(uint16_t SysTime)
     uint8_t ReturnVal;
     //create static array to store indices
     int8_t counter = 3 - MachineCounter;
-    printf("\rCounter: %u\r\n", counter);
     //Create int to track position in the array
     uint8_t index;
     //If count is valid

@@ -15,10 +15,10 @@
  When           Who     What/Why
  -------------- ---     --------
  11/7/19 22:24 ram     initial release
- 
+
 ****************************************************************************/
 
-// the common headers for C99 types 
+// the common headers for C99 types
 #include <stdint.h>
 #include <stdbool.h>
 #include "termio.h"
@@ -41,9 +41,9 @@ void Meteor_ClearAll(void);
 
 /***
 Meteor_HWInit Function Description
-	Arugments: None
+	Arguments: None
 	Returns: None
-	Call the SR24 init function to intialize hardware to communicate with the 
+	Call the SR24 init function to intialize hardware to communicate with the
 	cascaded registers
 ***/
 void Meteor_HWInit(void)
@@ -56,17 +56,17 @@ void Meteor_HWInit(void)
 
 /***
 Meteor_LightLEDBank Function Description
-	Arugments: BankNum, LEDNum
+	Arguments: BankNum, LEDNum
 		BankNum: the bank to work with
 		LEDNum: LED in the bank wished to light, 0 means all off
 	Returns: Status
 		If State = false, invalid parameters where given
-	Figures out what value to write to SR24 to get the right LED lit. Will use 
+	Figures out what value to write to SR24 to get the right LED lit. Will use
 	masks to preserve the lighting on any other trace
 ***/
 bool Meteor_LightLEDBank(uint8_t BankNum, uint8_t LEDNum)
 {
-	//Set return val to false as defualt
+	//Set return val to false as default
 	bool ReturnVal = false;
 	//If LEDNum > 8 and Bank num  > 2
 	if((LEDNum>8)||(BankNum>2))
@@ -105,10 +105,10 @@ bool Meteor_LightLEDBank(uint8_t BankNum, uint8_t LEDNum)
 		//Shift the 1 left by banknum*8+LEDnum
 		uint8_t shiftval;
 		shiftval = (BankNum*8)+LEDNum-1;
-		LEDValue = LEDValue << shiftval; 
+		LEDValue = LEDValue << shiftval;
 		//OR with masked register value
 		NewSR24Value |= LEDValue;
-		
+
 	}
 	//end if	//call SR24_write to write value to shift register
 	SR24_Write(NewSR24Value);
@@ -118,7 +118,7 @@ bool Meteor_LightLEDBank(uint8_t BankNum, uint8_t LEDNum)
 
 /***
 Meteor_ClearAll Function Description
-	Arugments: None
+	Arguments: None
 	Returns: None
 	Calls clear bank for each bank
 ***/

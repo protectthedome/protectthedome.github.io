@@ -14,10 +14,10 @@
  When           Who     What/Why
  -------------- ---     --------
  11/10/19 16:04 ram     initial release
- 
+
 ****************************************************************************/
 
-// the common headers for C99 types 
+// the common headers for C99 types
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -43,7 +43,7 @@
 #include "ServoDefs.h"
 
 //Definitions
-#define ALL_BITS (0xff<<2) 
+#define ALL_BITS (0xff<<2)
 #define POWER_IO_PORT HWREG(GPIO_PORTD_BASE+(GPIO_O_DATA+ALL_BITS))
 #define POWER_PIN BIT6HI;
 #define READ_PIN(x) ((x &BIT6HI)>>6)
@@ -57,6 +57,12 @@ uint8_t PowerLib_QueryGauge(void);
 /***Module Level Variables***/
 static uint8_t GaugePosition;
 
+/***
+ PowerLib_HWInit Function Description
+	Arguments: None
+	Returns: None
+	Initialize ports needed for Power game
+***/
 void PowerLib_HWInit(void)
 {
   //Turn on PORTD
@@ -69,7 +75,12 @@ void PowerLib_HWInit(void)
   HWREG(GPIO_PORTD_BASE+GPIO_O_DIR) &= BIT6LO;
 }
 
-
+/***
+ PowerLib_PinState Function Description
+	Arguments: None
+	Returns: uint8_t Pin value from power crank
+	Read current state of power crank
+***/
 uint8_t PowerLib_PinState(void)
 {
   //Get the value of PORTD and mask
@@ -81,6 +92,12 @@ uint8_t PowerLib_PinState(void)
   return(PinValue);
 }
 
+/***
+ PowerLib_MoveGauge Function Description
+	Arguments: uint8_t desired position of the gauge
+	Returns: bool, true if was able to move the gauge
+	Moves the power gauge to a desire position
+***/
 bool PowerLib_MoveGauge(uint8_t position)
 {
   //Cal the servo lib function
@@ -94,8 +111,13 @@ bool PowerLib_MoveGauge(uint8_t position)
   return(status);
 }
 
+/***
+ PowerLib_QueryGauge Function Description
+	Arguments: none
+	Returns: uint8_t current power gauge position
+	Returns the current power gauge position
+***/
 uint8_t PowerLib_QueryGauge(void)
 {
 	return(GaugePosition);
 }
-

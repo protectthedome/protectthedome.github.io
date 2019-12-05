@@ -96,7 +96,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 01/16/12, 10:00</span>
+<span class="hl com">     Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">InitPowerCrank_SM</span> <span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -109,7 +109,6 @@
   
   <span class="hl kwa">return true</span><span class="hl opt">;</span>
 <span class="hl opt">}</span>
-
 
 
 
@@ -128,8 +127,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 10/23/11, 19:25</span>
-<span class="hl com">****************************************************************************/</span>
+<span class="hl com">	Trey Weber     ****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">PostPowerCrank_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
   <span class="hl kwa">return</span> <span class="hl kwd">ES_PostToService</span><span class="hl opt">(</span> MyPriority<span class="hl opt">,</span> ThisEvent<span class="hl opt">);</span>
@@ -150,8 +148,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com">   </span>
 <span class="hl com"> Author</span>
-<span class="hl com">   J. Edward Carryer, 01/15/12, 15:23</span>
-<span class="hl com">****************************************************************************/</span>
+<span class="hl com">	Trey Weber   ****************************************************************************/</span>
 ES_Event_t <span class="hl kwd">RunPowerCrank_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
   ES_Event_t NewEvent<span class="hl opt">;</span>
@@ -162,7 +159,6 @@ ES_Event_t <span class="hl kwd">RunPowerCrank_SM</span><span class="hl opt">(</s
     <span class="hl kwa">case</span> NotCranking<span class="hl opt">:</span> 
 	<span class="hl slc">//Check for Falling edge</span>
 	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Falling_Edge<span class="hl opt">) {</span>
-    <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;GOT FALLING EDGE</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
 		<span class="hl slc">//Initialize timer</span>
 		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>CRANK_TIMER<span class="hl opt">,</span> <span class="hl num">50</span><span class="hl opt">);</span>
 		<span class="hl slc">//Update current state</span>
@@ -174,7 +170,6 @@ ES_Event_t <span class="hl kwd">RunPowerCrank_SM</span><span class="hl opt">(</s
 		CurrentTimePercentage <span class="hl opt">=</span> <span class="hl num">0</span><span class="hl opt">;</span>
 	<span class="hl opt">}</span>	
   <span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">) {</span>
-    <span class="hl slc">//printf(&quot;CRANK TIMEOUT \n\r&quot;);</span>
 		<span class="hl slc">//Check if we are below max count</span>
 		<span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">&lt;</span> MAX_COUNT<span class="hl opt">) {</span>
 			<span class="hl slc">//Increment counter</span>
@@ -186,7 +181,6 @@ ES_Event_t <span class="hl kwd">RunPowerCrank_SM</span><span class="hl opt">(</s
 		<span class="hl slc">//else we have reached maximum count</span>
 		<span class="hl kwa">else</span> <span class="hl opt">{</span>
 		<span class="hl slc">//Post interaction complete to arcade SM</span>
-    <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot; FINISHED CRANKING SUCCESSFULLY</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
 		NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Interaction_Completed<span class="hl opt">;</span>
 		<span class="hl kwd">PostArcadeFSM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
 		<span class="hl slc">//Post Power complete to cannon SM</span>
@@ -216,7 +210,6 @@ ES_Event_t <span class="hl kwd">RunPowerCrank_SM</span><span class="hl opt">(</s
 	<span class="hl opt">}</span>
 	<span class="hl slc">//else if we get a timeout</span>
 	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> ES_TIMEOUT<span class="hl opt">) {</span>
-    <span class="hl slc">//printf(&quot;CRANK TIMEOUT \n\r&quot;);</span>
 		<span class="hl slc">//Check if we are below max count</span>
 		<span class="hl kwa">if</span> <span class="hl opt">(</span>counter <span class="hl opt">&lt; (</span>MAX_COUNT<span class="hl opt">)) {</span>
 			<span class="hl slc">//Increment counter</span>
@@ -230,7 +223,6 @@ ES_Event_t <span class="hl kwd">RunPowerCrank_SM</span><span class="hl opt">(</s
 		<span class="hl slc">//else we have reached maximum count</span>
 		<span class="hl kwa">else</span> <span class="hl opt">{</span>
 		<span class="hl slc">//Post interaction complete to arcade SM</span>
-    <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot; FINISHED CRANKING SUCCESSFULLY</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
 		NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Interaction_Completed<span class="hl opt">;</span>
 		<span class="hl kwd">PostArcadeFSM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
 		<span class="hl slc">//Post Power complete to cannon SM</span>
@@ -248,18 +240,15 @@ ES_Event_t <span class="hl kwd">RunPowerCrank_SM</span><span class="hl opt">(</s
 	<span class="hl kwa">case</span> Idle_PC<span class="hl opt">:</span>
 	<span class="hl slc">//Power regen interaction begin</span>
 	<span class="hl kwa">if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Low_Power<span class="hl opt">) {</span>
-     <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;BEGIN CRANK INTERACTION</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
 		<span class="hl slc">//Check if state is low </span>
 		<span class="hl kwb">uint8_t</span> PinState <span class="hl opt">=</span> <span class="hl kwd">PowerLib_PinState</span><span class="hl opt">();</span>
 		<span class="hl kwa">if</span> <span class="hl opt">(</span>PinState <span class="hl opt">==</span> <span class="hl num">1</span><span class="hl opt">) {</span>
 			<span class="hl slc">//Update state</span>
 			CurrentSMState <span class="hl opt">=</span> NotCranking<span class="hl opt">;</span>
-      <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Going to not cranking</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
 		<span class="hl opt">}</span>
 		<span class="hl slc">//Else it is high</span>
 		<span class="hl kwa">else</span> <span class="hl opt">{</span>
 			<span class="hl slc">//Update state</span>
-      <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;Going to cranking</span> <span class="hl esc">\n\r</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
 			CurrentSMState <span class="hl opt">=</span> Cranking<span class="hl opt">;</span>
 			<span class="hl slc">//Init timer</span>
 			<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>CRANK_TIMER<span class="hl opt">,</span> <span class="hl num">30</span><span class="hl opt">);</span>
@@ -286,26 +275,32 @@ PowerCrank_SMState_t <span class="hl kwd">QueryPowerCrank_SM</span><span class="
 <span class="hl com">/***************************************************************************</span>
 <span class="hl com"> private functions</span>
 <span class="hl com"> ***************************************************************************/</span>
+ <span class="hl com">/***</span>
+<span class="hl com">CheckPowerCrankEvents Function Description</span>
+<span class="hl com"> 	Arguments: none</span>
+<span class="hl com"> 	Returns: bool. True if ther is a new event</span>
+<span class="hl com"> 	This function check for the rotation of the power crank</span>
+<span class="hl com"></span>
+<span class="hl com"></span>
+<span class="hl com"> 	Author: Trey Weber</span>
+<span class="hl com"> ***/</span>
+
  
 <span class="hl kwb">bool</span> <span class="hl kwd">CheckPowerCrankEvents</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">){</span>
   ES_Event_t NewEvent<span class="hl opt">;</span>
   <span class="hl kwb">bool</span> ReturnVal <span class="hl opt">=</span> <span class="hl kwa">false</span><span class="hl opt">;</span>
 
   <span class="hl slc">//Get current input state</span>
-  <span class="hl kwb">uint8_t</span> CurrentInputState <span class="hl opt">=</span> <span class="hl kwd">PowerLib_PinState</span><span class="hl opt">();</span>
-  <span class="hl slc">//printf(&quot;\rI&#39;m reading the pin!\r\n&quot;);</span>
-  
+  <span class="hl kwb">uint8_t</span> CurrentInputState <span class="hl opt">=</span> <span class="hl kwd">PowerLib_PinState</span><span class="hl opt">();</span>  
   <span class="hl slc">//Check if state has changed</span>
   <span class="hl kwa">if</span> <span class="hl opt">(</span>CurrentInputState <span class="hl opt">!=</span> LastInputState<span class="hl opt">) {</span>
     <span class="hl kwa">if</span> <span class="hl opt">(</span>CurrentInputState <span class="hl opt">!=</span> <span class="hl num">0</span><span class="hl opt">) {</span> <span class="hl slc">//Found rising edge</span>
       NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Rising_Edge<span class="hl opt">;</span>
-      <span class="hl kwd">printf</span><span class="hl opt">(</span><span class="hl str">&quot;</span><span class="hl esc">\r</span><span class="hl str">EC: Rising Edge</span><span class="hl esc">\r\n</span><span class="hl str">&quot;</span><span class="hl opt">);</span>
       <span class="hl kwd">PostPowerCrank_SM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
       <span class="hl kwd">PostResetService</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
     <span class="hl opt">}</span>
     <span class="hl kwa">else</span> <span class="hl opt">{</span> <span class="hl slc">//Found falling edge</span>
       NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> Falling_Edge<span class="hl opt">;</span>
-      <span class="hl slc">//printf(&quot;\rEC: Falling Edge\r\n&quot;);</span>
       <span class="hl kwd">PostPowerCrank_SM</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
       <span class="hl kwd">PostResetService</span><span class="hl opt">(</span>NewEvent<span class="hl opt">);</span>
     <span class="hl opt">}</span>

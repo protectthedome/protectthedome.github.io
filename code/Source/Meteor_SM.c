@@ -93,8 +93,7 @@ static ES_Event_t DeferralQueue[3+1];
  Notes
 
  Author
-     J. Edward Carryer, 01/16/12, 10:00
-****************************************************************************/
+	Trey Weber     ****************************************************************************/
 bool InitMeteor_SM ( uint8_t Priority )
 {
   MyPriority = Priority;
@@ -127,7 +126,7 @@ bool InitMeteor_SM ( uint8_t Priority )
  Notes
 
  Author
-     J. Edward Carryer, 10/23/11, 19:25
+     Trey Weber
 ****************************************************************************/
 bool PostMeteor_SM( ES_Event_t ThisEvent )
 {
@@ -149,7 +148,7 @@ bool PostMeteor_SM( ES_Event_t ThisEvent )
  Notes
    
  Author
-   J. Edward Carryer, 01/15/12, 15:23
+   Trey Weber
 ****************************************************************************/
 ES_Event_t RunMeteor_SM( ES_Event_t ThisEvent )
 {
@@ -163,7 +162,6 @@ ES_Event_t RunMeteor_SM( ES_Event_t ThisEvent )
 	if (ThisEvent.EventType == Meteor) {
 		//Reset count
 		counter = 0;
-    
 		//Init timer
 		ES_Timer_InitTimer(METEOR_TIMER, FALL_TIME);
 		//Get "random" number
@@ -176,20 +174,17 @@ ES_Event_t RunMeteor_SM( ES_Event_t ThisEvent )
     {
       BankNum = RandomNext();
     }
-    //printf("\rBankNum: %u\r\n", BankNum);
 		//Turn on top LED of bank
 		Meteor_LightLEDBank(BankNum, counter + 1);
 		//Update current state
 		CurrentSMState = MeteorFalling;
     //Increment Machine counter
-    //printf("\rMeteor MachineCounter: %u\r\n", MachineCounter);
     MachineCounter++;
     
 	}
   else if(ThisEvent.EventType == End_Of_Game || ThisEvent.EventType == RST)
   {
     MachineCounter = 0;
-    //printf("\rMeteor MachineCounter: %u\r\n", MachineCounter);
   }
     break;
 	case MeteorFalling:
@@ -214,7 +209,6 @@ ES_Event_t RunMeteor_SM( ES_Event_t ThisEvent )
 			//Post meteor destroyed to Meteor SM and cannon SM
 		  ThisEvent.EventType = Meteor_Destroyed;
       PostCannon_SM(ThisEvent);
-      //printf("\rI posted!\r\n");
       PostMeteor_SM(ThisEvent);
 		}
 	}
@@ -227,7 +221,6 @@ ES_Event_t RunMeteor_SM( ES_Event_t ThisEvent )
 		//Decrement LED
 		Meteor_LightLEDBank(BankNum, counter + 1);
 		//Init timer
-    //printf("\rFall Time: %i\r\n", FALL_TIME);
 		ES_Timer_InitTimer(METEOR_TIMER, FALL_TIME);
 		}
 		//else we have reached max count
@@ -265,9 +258,7 @@ ES_Event_t RunMeteor_SM( ES_Event_t ThisEvent )
 	break;
   case MeteorFlashing:
     if (ThisEvent.EventType == ES_TIMEOUT) {
-      //printf("meteor timeout");
       if (blinkcount <= BLINK_COUNT_MAX) {
-        //printf("1\r\n");
         //we are still flashing
         if ((blinkcount % 2) == 0) {
           //turn off
@@ -281,7 +272,6 @@ ES_Event_t RunMeteor_SM( ES_Event_t ThisEvent )
         ES_Timer_InitTimer(METEOR_TIMER, DESTROYED_DELAY);
       }
       else {
-         //printf("2");
         //we are done flashing
         //Reset counter
         counter = 0;
@@ -304,6 +294,15 @@ ES_Event_t RunMeteor_SM( ES_Event_t ThisEvent )
 /***************************************************************************
  private functions
  ***************************************************************************/
+ /***
+RandomNext Function Description
+ 	Arguments: none
+ 	Returns: uint8_t, random number
+ 	This function generates a pseudorandom number
+
+ 	Author: Riyaz Merchant
+ ***/
+
 
 static uint8_t RandomNext(void)
 {

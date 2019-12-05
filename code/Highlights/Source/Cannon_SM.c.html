@@ -86,7 +86,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 01/16/12, 10:00</span>
+<span class="hl com">     Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">InitCannon_SM</span> <span class="hl opt">(</span> <span class="hl kwb">uint8_t</span> Priority <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -138,7 +138,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com"></span>
 <span class="hl com"> Author</span>
-<span class="hl com">     J. Edward Carryer, 10/23/11, 19:25</span>
+<span class="hl com">	Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 <span class="hl kwb">bool</span> <span class="hl kwd">PostCannon_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -160,7 +160,7 @@
 <span class="hl com"> Notes</span>
 <span class="hl com">   </span>
 <span class="hl com"> Author</span>
-<span class="hl com">   J. Edward Carryer, 01/15/12, 15:23</span>
+<span class="hl com">   Trey Weber</span>
 <span class="hl com">****************************************************************************/</span>
 ES_Event_t <span class="hl kwd">RunCannon_SM</span><span class="hl opt">(</span> ES_Event_t ThisEvent <span class="hl opt">)</span>
 <span class="hl opt">{</span>
@@ -186,13 +186,11 @@ ES_Event_t <span class="hl kwd">RunCannon_SM</span><span class="hl opt">(</span>
 	<span class="hl opt">}</span>
 	<span class="hl slc">//else if meteor is destroyed</span>
 	<span class="hl kwa">else if</span> <span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> Meteor_Destroyed<span class="hl opt">) {</span>
-    <span class="hl slc">//printf(&quot;\rMeteor Destroyed\r\n&quot;); </span>
 		<span class="hl slc">//Start timer</span>
 		<span class="hl kwd">ES_Timer_InitTimer</span><span class="hl opt">(</span>CANNON_TIMER<span class="hl opt">,</span> <span class="hl num">1500</span><span class="hl opt">);</span>
 		<span class="hl slc">//Start vibratory motor</span>
 		CannonState <span class="hl opt">=</span> On<span class="hl opt">;</span>
 		<span class="hl kwd">Cannon_Vibrate</span><span class="hl opt">(</span>CannonState<span class="hl opt">);</span>
-    
 		<span class="hl slc">//Update current state</span>
 		CurrentSMState <span class="hl opt">=</span> KnobVibrating<span class="hl opt">;</span>
 	<span class="hl opt">}</span>
@@ -208,7 +206,6 @@ ES_Event_t <span class="hl kwd">RunCannon_SM</span><span class="hl opt">(</span>
 	<span class="hl opt">}</span>
 	<span class="hl slc">//Else if we receive a new pot value</span>
 	<span class="hl kwa">else if</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventType <span class="hl opt">==</span> New_Pot_Value<span class="hl opt">) {</span>
-     <span class="hl slc">//printf(&quot;move to new pot value %u\n\r&quot;,ThisEvent.EventParam);</span>
 		<span class="hl slc">//Position cannon</span>
 		<span class="hl kwd">Cannon_UserPosition</span><span class="hl opt">(</span>ThisEvent<span class="hl opt">.</span>EventParam<span class="hl opt">);</span>		
 	<span class="hl opt">}</span>
@@ -261,6 +258,15 @@ ES_Event_t <span class="hl kwd">RunCannon_SM</span><span class="hl opt">(</span>
 <span class="hl com">/***************************************************************************</span>
 <span class="hl com"> private functions</span>
 <span class="hl com"> ***************************************************************************/</span>
+ <span class="hl com">/***</span>
+<span class="hl com">PotChecker Function Description</span>
+<span class="hl com"> 	Arguments: none</span>
+<span class="hl com"> 	Returns: bool. True if there is a new event</span>
+<span class="hl com"> 	This function check for the change in knob position</span>
+<span class="hl com"></span>
+<span class="hl com"> 	Author: Trey Weber</span>
+<span class="hl com"> ***/</span>
+
 
 <span class="hl kwb">bool</span> <span class="hl kwd">PotChecker</span><span class="hl opt">(</span><span class="hl kwb">void</span><span class="hl opt">) {</span>
   ES_Event_t NewEvent<span class="hl opt">;</span>
@@ -271,7 +277,6 @@ ES_Event_t <span class="hl kwd">RunCannon_SM</span><span class="hl opt">(</span>
   
   <span class="hl slc">//If pot has been turned more than 1%</span>
   <span class="hl kwa">if</span> <span class="hl opt">(</span><span class="hl kwd">abs</span><span class="hl opt">(</span>ADPotVal<span class="hl opt">-</span>CurrentCannonADCount<span class="hl opt">) &gt;</span> DELTA<span class="hl opt">) {</span>
-	  <span class="hl slc">//printf(&quot;\rNew Pot Value!\r\n&quot;);</span>
     <span class="hl slc">//Post to service</span>
 	  NewEvent<span class="hl opt">.</span>EventType <span class="hl opt">=</span> New_Pot_Value<span class="hl opt">;</span>
 	  NewEvent<span class="hl opt">.</span>EventParam <span class="hl opt">=</span> ADPotVal<span class="hl opt">;</span>

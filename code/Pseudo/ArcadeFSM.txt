@@ -33,7 +33,7 @@ else if CurrentSMState is Playing
 		Set CurrentSMState to WaitforNext
 	else if Event is Global_Time_Out
 		If power crank is idle
-			Post win event 
+			Post win event
 		else
 			Post game over event
 		Initialize timer
@@ -44,7 +44,7 @@ else if CurrentSMState is WaitForNext
 		Turn off buzzer
 		If all interactions have been completed
 			Post win event
-			Release Tot	
+			Release Tot
 			Initialize timer
 			Turn off buzzer
 			Set CurrentSMState to WaitForTotRelease
@@ -64,7 +64,7 @@ else if CurrentSMState is WaitForNext
 		Set CurrentSMState to WaitForTotRelease
 	else if Event is Global_Time_Out
 		If power crank is idle
-			Post win event 
+			Post win event
 		else
 			Post game over event
 		Initialize timer
@@ -75,4 +75,20 @@ else if CurrentSMState is WaitForTotRelease
 	if Event is ES_Timeout
 		Block Tot slot
 		Set CurrentSMState to NotPlaying
-	
+
+
+
+
+	TotChecker:
+	Returnvalue is false
+	Get current TOT state
+	if CurrentSMState is NotPlaying
+		if TOT state changed
+			if TOT is detected
+				Post to all services that the tot was inserted
+				Returnvalue is true
+			end if
+		Update last TOT State
+		end if
+	end if
+Return Returnvalue

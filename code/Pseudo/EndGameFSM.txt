@@ -47,8 +47,6 @@ Takes in ThisEvent, returns nothing
     If ThisEvent is of type End_Of_Game
       If ThisEvent has parameter WIN
         Start a timer for WIN_DELAY
-        Return the TOT
-        Turn the crisis buzzer off
         Initialize counter to the number of LEDs in each meteor bank
         Initialize position to 0
         Move the cannon to the first position
@@ -56,8 +54,6 @@ Takes in ThisEvent, returns nothing
       End If
       If ThisEvent has parameter GAME_OVER
         Start a timer for LOSE_DELAY
-        Release the TOT
-        Turn the crisis buzzer off
         Create variable CannonPosFromUp
         Set CannonPosFromUp to the cannon's distance from upright
         If the cannon is to the right of upright
@@ -118,19 +114,16 @@ Takes in ThisEvent, returns nothing
         If ToggleOn is true
           Light the LED closest to the dome in each bank
           Turn on all the crisis indicator LEDs
-          Turn on the crisis buzzer
           Set ToggleOn to false
         Else
           Turn off all meteor LEDs
           Turn off all crisis indicator LEDs
-          Turn off crisis buzzer
           Set ToggleOn to true
         End If
         Decrement the counter by 1
         If the counter is now 0
           Turn off all meteor LEDs
           Turn off all crisis indicator LEDs
-          Turn off crisis buzzer
           Start a timer for OFF_DELAY
         Else
           Start a timer for LOSE_DELAY
@@ -139,7 +132,6 @@ Takes in ThisEvent, returns nothing
     Else If ThisEvent is of type Tot_Inserted
       Turn off all meteor LEDs
       Turn off all crisis indicator LEDs
-      Turn off crisis buzzer
       Set CurrentState to Idle_E
     End If
   End If
